@@ -1,4 +1,4 @@
-import { SymbolType, Cell, Position, SYMBOL_COLORS, BOARD_WIDTH, BOARD_HEIGHT, DragState, SwapAnimation } from './types';
+import { SymbolType, Cell, Position, SYMBOL_COLORS, BOARD_WIDTH, BOARD_HEIGHT, DragState, SwapAnimation, MatchAnimation } from './types';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -37,11 +37,16 @@ export class Renderer {
     this.offsetY = (height - totalGridHeight) / 2 + 40; // Extra offset for score display
   }
 
-  public render(board: Cell[][], score: number, selectedCell: Position | null = null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null): void {
+  public render(board: Cell[][], score: number, selectedCell: Position | null = null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = []): void {
     this.clearCanvas();
     this.renderScore(score);
     this.renderGrid();
-    this.renderBoard(board, selectedCell, dragInfo, swapAnimation);
+    this.renderBoard(board, selectedCell, dragInfo, swapAnimation, matchAnimations);
+    
+    // Render match animations on top
+    matchAnimations.forEach(animation => {
+      this.renderMatchAnimation(animation, board);
+    });
     
     // Render drag preview if dragging
     if (dragInfo) {
@@ -102,7 +107,7 @@ export class Renderer {
     }
   }
 
-  private renderBoard(board: Cell[][], selectedCell: Position | null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null): void {
+  private renderBoard(board: Cell[][], selectedCell: Position | null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = []): void {
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
@@ -110,8 +115,18 @@ export class Renderer {
         const isSelected = selectedCell && selectedCell.x === x && selectedCell.y === y;
         const isDraggedCell = dragInfo && dragInfo.from.x === x && dragInfo.from.y === y;
         
+        // Check if this cell is part of a match animation
+        const isAnimatingMatch = matchAnimations.some(animation => 
+          animation.copies.some(copy => copy.startPosition.x === x && copy.startPosition.y === y)
+        );
+        
         // Skip rendering the dragged cell in its original position during drag
         if (isDraggedCell && dragInfo.mousePosition) {
+          continue;
+        }
+        
+        // Skip rendering cells that are being animated for matches
+        if (isAnimatingMatch) {
           continue;
         }
         
@@ -287,5 +302,36 @@ export class Renderer {
       this.ctx.lineWidth = 3;
       this.ctx.strokeRect(toPixelX, toPixelY, this.cellSize, this.cellSize);
     }
+  }
+
+  private renderMatchAnimation(animation: MatchAnimation, _board: Cell[][]): void {
+    // Calculate opacity (fade from 1.0 to 0.0)
+    const opacity = 1 - animation.progress;
+    
+    // Save current context state
+    this.ctx.save();
+    this.ctx.globalAlpha = opacity;
+    
+    animation.copies.forEach(copy => {
+      // Convert grid position to pixel position
+      const centerX = this.offsetX + copy.currentPosition.x * this.cellSize + this.cellSize / 2;
+      const centerY = this.offsetY + copy.currentPosition.y * this.cellSize + this.cellSize / 2;
+      
+      // Scale to half size (half the area = sqrt(0.5) ≈ 0.707 scale)
+      const scale = Math.sqrt(0.5);
+      
+      // Apply scaling transformation
+      this.ctx.save();
+      this.ctx.translate(centerX, centerY);
+      this.ctx.scale(scale, scale);
+      
+      // Render the symbol at the scaled size
+      this.renderSymbol(copy.symbol, 0, 0);
+      
+      this.ctx.restore();
+    });
+    
+    // Restore context state
+    this.ctx.restore();
   }
 }

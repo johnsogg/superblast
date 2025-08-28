@@ -22,6 +22,7 @@ export interface GameState {
   selectedCell: Position | null;
   isSwapping: boolean;
   swapAnimation: SwapAnimation | null;
+  matchAnimations: MatchAnimation[];
 }
 
 export interface SwapAnimation {
@@ -36,6 +37,20 @@ export interface DragState {
   from: Position;
   to: Position | null;
   mousePosition: { x: number; y: number } | null;
+}
+
+export interface MatchAnimationCopy {
+  startPosition: Position;
+  currentPosition: { x: number; y: number };
+  targetEdge: 'top' | 'bottom' | 'left' | 'right';
+  symbol: SymbolType;
+}
+
+export interface MatchAnimation {
+  copies: MatchAnimationCopy[];
+  progress: number; // 0 to 1
+  startTime: number;
+  duration: number;
 }
 
 export interface Match {

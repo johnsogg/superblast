@@ -1,7 +1,7 @@
 import { GameBoard } from './GameBoard';
 import { Renderer } from './Renderer';
 import { InputHandler } from './InputHandler';
-import { GameState, Position, Match, POINTS, DragState } from './types';
+import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy } from './types';
 
 export class Game {
   private board: GameBoard;
@@ -24,6 +24,7 @@ export class Game {
       selectedCell: null,
       isSwapping: false,
       swapAnimation: null,
+      matchAnimations: [],
     };
 
     this.inputHandler = new InputHandler(canvas, this.renderer, {
@@ -52,8 +53,10 @@ export class Game {
   }
 
   private updateAnimations(): void {
+    const now = performance.now();
+    
+    // Update swap animation
     if (this.state.swapAnimation) {
-      const now = performance.now();
       const elapsed = now - this.state.swapAnimation.startTime;
       this.state.swapAnimation.progress = Math.min(elapsed / this.state.swapAnimation.duration, 1);
 
@@ -61,6 +64,20 @@ export class Game {
         this.state.swapAnimation = null;
       }
     }
+    
+    // Update match animations
+    this.state.matchAnimations = this.state.matchAnimations.filter(animation => {
+      const elapsed = now - animation.startTime;
+      animation.progress = Math.min(elapsed / animation.duration, 1);
+      
+      // Update positions of all copies
+      animation.copies.forEach(copy => {
+        this.updateCopyPosition(copy, animation.progress);
+      });
+      
+      // Keep animation if not complete
+      return animation.progress < 1;
+    });
   }
 
   private render(): void {
@@ -69,7 +86,8 @@ export class Game {
       this.state.score,
       this.state.selectedCell,
       this.dragState,
-      this.state.swapAnimation
+      this.state.swapAnimation,
+      this.state.matchAnimations
     );
   }
 
@@ -198,8 +216,11 @@ export class Game {
 
     this.state.score += totalScore;
 
-    // Visual feedback for matches (brief highlight)
-    await this.animateMatches(matches);
+    // Start match animations
+    this.startMatchAnimations(matches);
+
+    // Wait for match animations to complete
+    await this.waitForMatchAnimations();
 
     // Remove matches and replace with new symbols
     this.board.removeMatches(matches);
@@ -213,19 +234,86 @@ export class Game {
     }
   }
 
-  private async animateMatches(_matches: Match[]): Promise<void> {
+  private startMatchAnimations(matches: Match[]): void {
+    const now = performance.now();
+    
+    matches.forEach(match => {
+      const copies: MatchAnimationCopy[] = [];
+      
+      // Create 4 copies for each matched position
+      match.positions.forEach(pos => {
+        const edges: ('top' | 'bottom' | 'left' | 'right')[] = ['top', 'bottom', 'left', 'right'];
+        
+        edges.forEach(edge => {
+          copies.push({
+            startPosition: pos,
+            currentPosition: { x: pos.x, y: pos.y },
+            targetEdge: edge,
+            symbol: match.symbol,
+          });
+        });
+      });
+      
+      const matchAnimation: MatchAnimation = {
+        copies,
+        progress: 0,
+        startTime: now,
+        duration: 1000, // 1 second animation
+      };
+      
+      this.state.matchAnimations.push(matchAnimation);
+    });
+  }
+
+  private updateCopyPosition(copy: MatchAnimationCopy, progress: number): void {
+    const easedProgress = this.easeInOutCubic(progress);
+    const startX = copy.startPosition.x;
+    const startY = copy.startPosition.y;
+    
+    let targetX: number;
+    let targetY: number;
+    
+    // Calculate target position based on edge
+    switch (copy.targetEdge) {
+      case 'top':
+        targetX = startX;
+        targetY = -1; // Just outside the top edge
+        break;
+      case 'bottom':
+        targetX = startX;
+        targetY = 7; // Just outside the bottom edge (board is 7 high)
+        break;
+      case 'left':
+        targetX = -1; // Just outside the left edge
+        targetY = startY;
+        break;
+      case 'right':
+        targetX = 9; // Just outside the right edge (board is 9 wide)
+        targetY = startY;
+        break;
+    }
+    
+    // Interpolate position
+    copy.currentPosition = {
+      x: startX + (targetX - startX) * easedProgress,
+      y: startY + (targetY - startY) * easedProgress,
+    };
+  }
+
+  private easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  private async waitForMatchAnimations(): Promise<void> {
     return new Promise((resolve) => {
-      // Simple animation: briefly highlight matched cells
-      let flashCount = 0;
-      const flashInterval = setInterval(() => {
-        // This would normally modify the rendering to highlight matches
-        // For now, we'll just wait a bit
-        flashCount++;
-        if (flashCount >= 6) {
-          clearInterval(flashInterval);
+      const checkAnimations = () => {
+        if (this.state.matchAnimations.length > 0) {
+          requestAnimationFrame(checkAnimations);
+        } else {
           resolve();
         }
-      }, 100);
+      };
+      checkAnimations();
     });
   }
 
