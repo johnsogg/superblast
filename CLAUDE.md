@@ -1,10 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-Superblast is a web-based match-3 style game built with TypeScript and HTML5 Canvas. It displays a 9x7 grid of squares with five different symbols (Leaf, Snowflake, Fire, Raindrop, Lightning). Players drag adjacent cells to swap symbols and create matches of 3+ in a row to score points (10/20/30 for 3/4/5+ matches).
+Important: refer to @GAME.md for all game mechanics and player flow.
 
 ## Technology Stack
 
@@ -25,19 +21,3 @@ Superblast is a web-based match-3 style game built with TypeScript and HTML5 Can
 - `npm run lint` - Check code with ESLint
 - `npm run lint:fix` - Fix ESLint issues automatically
 - `npm run typecheck` - Run TypeScript type checking
-
-## Project Structure
-
-- `src/` - Source code
-  - `types.ts` - Type definitions and constants
-  - `GameBoard.ts` - Board state management and game logic
-  - `Renderer.ts` - Canvas rendering and visual effects
-  - `InputHandler.ts` - Mouse/touch input handling
-  - `Game.ts` - Main game controller
-  - `main.ts` - Entry point and game initialization
-- `test/` - Test files
-- `index.html` - Main HTML entry point with canvas
-- `vite.config.ts` - Vite configuration
-- `vitest.config.ts` - Vitest test configuration
-- `tsconfig.json` - TypeScript configuration
-- `eslint.config.js` - ESLint configuration

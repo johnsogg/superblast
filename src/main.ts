@@ -6,8 +6,9 @@ if (!canvas) {
   throw new Error('Could not find game canvas element');
 }
 
-// Set canvas size to fill the viewport
-canvas.width = window.innerWidth;
+// Set canvas size to account for UI column (280px + 20px gap = 300px)
+const uiColumnWidth = 300;
+canvas.width = Math.max(400, window.innerWidth - uiColumnWidth);
 canvas.height = window.innerHeight;
 
 // Initialize and start the game

@@ -23,6 +23,27 @@ export interface GameState {
   isSwapping: boolean;
   swapAnimation: SwapAnimation | null;
   matchAnimations: MatchAnimation[];
+  timer: TimerState;
+  level: LevelState;
+  showLevelCompletionPopup: boolean;
+}
+
+export interface TimerState {
+  timeRemaining: number; // in milliseconds
+  isActive: boolean;
+  startTime: number; // performance.now() when timer started
+}
+
+export interface LevelState {
+  currentLevel: number;
+  progress: number; // 0 to 1 (0% to 100%)
+  progressDenominator: number; // the denominator for this level
+}
+
+export enum PopupAction {
+  HOME = 'home',
+  PLAY_NEXT = 'play_next',
+  LEVEL_MAP = 'level_map',
 }
 
 export interface SwapAnimation {
@@ -74,4 +95,23 @@ export const POINTS = {
   THREE_IN_ROW: 10,
   FOUR_IN_ROW: 20,
   FIVE_IN_ROW: 30,
+} as const;
+
+export const LEVEL_DENOMINATORS = {
+  1: 5,
+  2: 8,
+  3: 10,
+  4: 12,
+  5: 15,
+  6: 20,
+  7: 25,
+  8: 30,
+  9: 40,
+  10: 50,
+} as const;
+
+export const MATCH_PROGRESS_NUMERATORS = {
+  3: 1, // 3-match fills 1/denominator
+  4: 2, // 4-match fills 2/denominator  
+  5: 3, // 5+-match fills 3/denominator
 } as const;

@@ -22,7 +22,7 @@ export class Renderer {
     
     // Calculate cell size to fit the grid with some padding
     const availableWidth = width * 0.9; // 90% of canvas width
-    const availableHeight = height * 0.8; // 80% of canvas height (leave space for score)
+    const availableHeight = height * 0.9; // 90% of canvas height (no space needed for score)
     
     const cellWidth = availableWidth / BOARD_WIDTH;
     const cellHeight = availableHeight / BOARD_HEIGHT;
@@ -34,12 +34,11 @@ export class Renderer {
     const totalGridHeight = this.cellSize * BOARD_HEIGHT;
     
     this.offsetX = (width - totalGridWidth) / 2;
-    this.offsetY = (height - totalGridHeight) / 2 + 40; // Extra offset for score display
+    this.offsetY = (height - totalGridHeight) / 2;
   }
 
-  public render(board: Cell[][], score: number, selectedCell: Position | null = null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = []): void {
+  public render(board: Cell[][], selectedCell: Position | null = null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = []): void {
     this.clearCanvas();
-    this.renderScore(score);
     this.renderGrid();
     this.renderBoard(board, selectedCell, dragInfo, swapAnimation, matchAnimations);
     
@@ -77,12 +76,6 @@ export class Renderer {
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  private renderScore(score: number): void {
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = `${Math.floor(this.cellSize / 3)}px Arial`;
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(`Score: ${score}`, this.canvas.width / 2, 30);
-  }
 
   private renderGrid(): void {
     this.ctx.strokeStyle = '#333';
