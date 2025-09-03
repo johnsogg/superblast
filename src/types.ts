@@ -26,6 +26,10 @@ export interface GameState {
   timer: TimerState;
   level: LevelState;
   showLevelCompletionPopup: boolean;
+  powerUps: PowerUp[];
+  powerUpDragState: PowerUpDragState | null;
+  activePowerUp: PowerUpType | null;
+  greenCell: Position | null;
 }
 
 export interface TimerState {
@@ -44,6 +48,23 @@ export enum PopupAction {
   HOME = 'home',
   PLAY_NEXT = 'play_next',
   LEVEL_MAP = 'level_map',
+}
+
+export enum PowerUpType {
+  FREE_SWAP = 'free_swap',
+  CLEAR_CELLS = 'clear_cells',
+  SYMBOL_SWAP = 'symbol_swap',
+}
+
+export interface PowerUp {
+  type: PowerUpType;
+  count: number;
+}
+
+export interface PowerUpDragState {
+  powerUpType: PowerUpType;
+  mousePosition: { x: number; y: number };
+  targetCell: Position | null;
 }
 
 export interface SwapAnimation {

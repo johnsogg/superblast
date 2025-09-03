@@ -44,6 +44,39 @@ export class GameBoard {
     return true;
   }
 
+  public forceSwapCells(pos1: Position, pos2: Position): boolean {
+    const cell1 = this.getCell(pos1);
+    const cell2 = this.getCell(pos2);
+
+    if (!cell1 || !cell2) {
+      return false;
+    }
+
+    const temp = cell1.symbol;
+    cell1.symbol = cell2.symbol;
+    cell2.symbol = temp;
+
+    return true;
+  }
+
+  public removeCells(positions: Position[]): void {
+    positions.forEach(pos => {
+      if (this.isValidPosition(pos)) {
+        this.board[pos.y][pos.x].symbol = this.getRandomSymbol();
+      }
+    });
+  }
+
+  public swapAllSymbols(targetSymbol: SymbolType): void {
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      for (let x = 0; x < BOARD_WIDTH; x++) {
+        if (this.board[y][x].symbol === targetSymbol) {
+          this.board[y][x].symbol = this.getRandomSymbol();
+        }
+      }
+    }
+  }
+
   public findMatches(): Match[] {
     const matches: Match[] = [];
     

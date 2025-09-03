@@ -2,7 +2,7 @@ import { GameBoard } from './GameBoard';
 import { Renderer } from './Renderer';
 import { InputHandler } from './InputHandler';
 import { AudioUtils } from './AudioUtils';
-import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction } from './types';
+import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction, PowerUpType } from './types';
 
 export class Game {
   private board: GameBoard;
@@ -18,6 +18,11 @@ export class Game {
   private timerElement: HTMLElement;
   private progressBarElement: HTMLElement;
   private levelCompletionModalElement: HTMLElement;
+  private powerUpElements: {
+    freeSwap: HTMLElement;
+    clearCells: HTMLElement;
+    symbolSwap: HTMLElement;
+  };
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -43,6 +48,14 @@ export class Game {
         progressDenominator: LEVEL_DENOMINATORS[1],
       },
       showLevelCompletionPopup: false,
+      powerUps: [
+        { type: PowerUpType.FREE_SWAP, count: 0 },
+        { type: PowerUpType.CLEAR_CELLS, count: 0 },
+        { type: PowerUpType.SYMBOL_SWAP, count: 0 },
+      ],
+      powerUpDragState: null,
+      activePowerUp: null,
+      greenCell: null,
     };
 
     // Get UI elements
@@ -51,8 +64,18 @@ export class Game {
     this.progressBarElement = document.getElementById('progress-bar')!;
     this.levelCompletionModalElement = document.getElementById('level-completion-modal')!;
     
+    this.powerUpElements = {
+      freeSwap: document.getElementById('free-swap-count')!,
+      clearCells: document.getElementById('clear-cells-count')!,
+      symbolSwap: document.getElementById('symbol-swap-count')!,
+    };
+    
     if (!this.scoreElement || !this.timerElement || !this.progressBarElement || !this.levelCompletionModalElement) {
       throw new Error('Could not find required UI elements');
+    }
+    
+    if (!this.powerUpElements.freeSwap || !this.powerUpElements.clearCells || !this.powerUpElements.symbolSwap) {
+      throw new Error('Could not find required power-up UI elements');
     }
 
     // Set up modal button event listeners
@@ -62,6 +85,8 @@ export class Game {
       onCellClick: this.handleCellClick.bind(this),
       onCellDrag: this.handleCellDrag.bind(this),
       onDragUpdate: this.handleDragUpdate.bind(this),
+      onPowerUpDrag: this.handlePowerUpDrag.bind(this),
+      onPowerUpDragUpdate: this.handlePowerUpDragUpdate.bind(this),
     });
 
     this.setupResizeHandler();
@@ -118,13 +143,42 @@ export class Game {
       this.state.selectedCell,
       this.dragState,
       this.state.swapAnimation,
-      this.state.matchAnimations
+      this.state.matchAnimations,
+      this.state.greenCell,
+      this.state.powerUpDragState
     );
     this.updateUI();
   }
 
-  private handleCellClick(position: Position): void {
+  private async handleCellClick(position: Position): Promise<void> {
     if (this.state.isSwapping) {
+      return;
+    }
+    
+    // Handle free swap power-up click
+    if (this.state.activePowerUp === PowerUpType.FREE_SWAP && this.state.greenCell) {
+      console.log(`Free swap: swapping green cell (${this.state.greenCell.x},${this.state.greenCell.y}) with clicked cell (${position.x},${position.y})`);
+      
+      this.state.isSwapping = true;
+      this.state.selectedCell = null;
+      this.dragState = null;
+
+      // Force swap regardless of adjacency or match potential
+      this.board.forceSwapCells(this.state.greenCell, position);
+      
+      // Clear free swap state
+      this.state.activePowerUp = null;
+      this.state.greenCell = null;
+      
+      this.state.board = this.board.getBoard();
+      
+      // Check for matches after free swap
+      const matches = this.board.findMatches();
+      if (matches.length > 0) {
+        await this.processMatches(matches, true, true);
+      }
+      
+      this.state.isSwapping = false;
       return;
     }
     
@@ -134,6 +188,33 @@ export class Game {
 
   private async handleCellDrag(from: Position, to: Position): Promise<void> {
     if (this.state.isSwapping) {
+      return;
+    }
+
+    // Handle free swap power-up
+    if (this.state.activePowerUp === PowerUpType.FREE_SWAP && this.state.greenCell) {
+      console.log(`Free swap: swapping green cell (${this.state.greenCell.x},${this.state.greenCell.y}) with (${to.x},${to.y})`);
+      
+      this.state.isSwapping = true;
+      this.state.selectedCell = null;
+      this.dragState = null;
+
+      // Force swap regardless of adjacency or match potential
+      this.board.forceSwapCells(this.state.greenCell, to);
+      
+      // Clear free swap state
+      this.state.activePowerUp = null;
+      this.state.greenCell = null;
+      
+      this.state.board = this.board.getBoard();
+      
+      // Check for matches after free swap
+      const matches = this.board.findMatches();
+      if (matches.length > 0) {
+        await this.processMatches(matches, true, true);
+      }
+      
+      this.state.isSwapping = false;
       return;
     }
 
@@ -170,8 +251,8 @@ export class Game {
       
       if (matches.length > 0) {
         console.log(`Found ${matches.length} matches, processing...`);
-        // Process matches and update score
-        await this.processMatches(matches, true);
+        // Process matches and update score - track if chain reaction occurs
+        await this.processMatches(matches, true, true);
       } else {
         console.log('No matches found, will revert after 1 second');
         // No matches found, wait 1 second then swap back with animation
@@ -237,15 +318,20 @@ export class Game {
     }
   }
 
-  private async processMatches(matches: Match[], isDirectMatch: boolean = true): Promise<void> {
-    // Calculate score
+  private async processMatches(matches: Match[], isDirectMatch: boolean = true, isFirstInChain: boolean = false): Promise<void> {
+    // Calculate score and award power-ups
     let totalScore = 0;
+    let hasFourMatch = false;
+    let hasFiveMatch = false;
+    
     matches.forEach(match => {
       if (match.length >= 5) {
         totalScore += POINTS.FIVE_IN_ROW;
+        hasFiveMatch = true;
         this.audioUtils.playMatchSound(match.length, isDirectMatch);
       } else if (match.length === 4) {
         totalScore += POINTS.FOUR_IN_ROW;
+        hasFourMatch = true;
         this.audioUtils.playMatchSound(match.length, isDirectMatch);
       } else if (match.length === 3) {
         totalScore += POINTS.THREE_IN_ROW;
@@ -254,6 +340,20 @@ export class Game {
     });
 
     this.state.score += totalScore;
+    
+    // Award power-ups based on matches
+    if (hasFourMatch) {
+      this.awardPowerUp(PowerUpType.FREE_SWAP);
+    }
+    
+    if (hasFiveMatch) {
+      this.awardPowerUp(PowerUpType.SYMBOL_SWAP);
+    }
+    
+    // Check for chain reaction (multiple direct matches award Symbol Swap)
+    if (isDirectMatch && matches.length > 1) {
+      this.awardPowerUp(PowerUpType.SYMBOL_SWAP);
+    }
 
     // Update progress bar based on matches (both direct and cascade matches contribute)
     matches.forEach(match => {
@@ -281,7 +381,12 @@ export class Game {
     const newMatches = this.board.findMatches();
     if (newMatches.length > 0) {
       // Recursively process new matches (cascade effect)
-      await this.processMatches(newMatches, false);
+      // If this is a cascade after the first direct match, it's a chain reaction
+      if (isFirstInChain && !isDirectMatch) {
+        this.awardPowerUp(PowerUpType.SYMBOL_SWAP);
+        console.log('Chain reaction detected! Awarded Symbol Swap power-up.');
+      }
+      await this.processMatches(newMatches, false, false);
     }
   }
 
@@ -404,6 +509,11 @@ export class Game {
     } else {
       this.levelCompletionModalElement.classList.remove('show');
     }
+
+    // Update power-up counts
+    this.powerUpElements.freeSwap.textContent = this.getPowerUpCount(PowerUpType.FREE_SWAP).toString();
+    this.powerUpElements.clearCells.textContent = this.getPowerUpCount(PowerUpType.CLEAR_CELLS).toString();
+    this.powerUpElements.symbolSwap.textContent = this.getPowerUpCount(PowerUpType.SYMBOL_SWAP).toString();
   }
 
   private setupModalEventListeners(): void {
@@ -456,6 +566,107 @@ export class Game {
     console.log(`Started level ${this.state.level.currentLevel}`);
   }
 
+  private awardPowerUp(type: PowerUpType): void {
+    const powerUp = this.state.powerUps.find(p => p.type === type);
+    if (powerUp) {
+      powerUp.count++;
+      console.log(`Awarded ${type} power-up! New count: ${powerUp.count}`);
+    }
+  }
+
+  private usePowerUp(type: PowerUpType): boolean {
+    const powerUp = this.state.powerUps.find(p => p.type === type);
+    if (powerUp && powerUp.count > 0) {
+      powerUp.count--;
+      return true;
+    }
+    return false;
+  }
+
+  private getPowerUpCount(type: PowerUpType): number {
+    const powerUp = this.state.powerUps.find(p => p.type === type);
+    return powerUp ? powerUp.count : 0;
+  }
+
+  private handlePowerUpDrag(powerUpType: PowerUpType, targetPosition: Position): void {
+    if (this.state.isSwapping) {
+      return;
+    }
+
+    console.log(`Power-up ${powerUpType} used on cell (${targetPosition.x},${targetPosition.y})`);
+    
+    if (!this.usePowerUp(powerUpType)) {
+      console.log(`No ${powerUpType} power-ups available`);
+      return;
+    }
+
+    switch (powerUpType) {
+      case PowerUpType.FREE_SWAP:
+        this.state.greenCell = targetPosition;
+        this.state.activePowerUp = PowerUpType.FREE_SWAP;
+        console.log('Free swap activated - click any cell to swap with the green cell');
+        break;
+      case PowerUpType.CLEAR_CELLS:
+        this.useClearCellsPowerUp(targetPosition);
+        break;
+      case PowerUpType.SYMBOL_SWAP:
+        this.useSymbolSwapPowerUp(targetPosition);
+        break;
+    }
+  }
+
+  private handlePowerUpDragUpdate(powerUpType: PowerUpType, targetPosition: Position | null, mousePos: { x: number; y: number } | null): void {
+    this.state.powerUpDragState = targetPosition ? {
+      powerUpType,
+      mousePosition: mousePos || { x: 0, y: 0 },
+      targetCell: targetPosition,
+    } : null;
+  }
+
+  private async useClearCellsPowerUp(centerPosition: Position): Promise<void> {
+    const cellsToRemove: Position[] = [];
+    
+    // Add center cell and all 8 neighbors (including diagonals)
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const x = centerPosition.x + dx;
+        const y = centerPosition.y + dy;
+        
+        if (x >= 0 && x < 9 && y >= 0 && y < 7) { // Within board bounds
+          cellsToRemove.push({ x, y });
+        }
+      }
+    }
+
+    // Remove the cells from the board
+    this.board.removeCells(cellsToRemove);
+    this.state.board = this.board.getBoard();
+    
+    console.log(`Cleared ${cellsToRemove.length} cells with Clear Cells power-up`);
+    
+    // Check for new matches after the clearing
+    const newMatches = this.board.findMatches();
+    if (newMatches.length > 0) {
+      await this.processMatches(newMatches, false, false);
+    }
+  }
+
+  private async useSymbolSwapPowerUp(targetPosition: Position): Promise<void> {
+    const targetSymbol = this.state.board[targetPosition.y][targetPosition.x].symbol;
+    
+    // Replace all instances of the target symbol with random symbols
+    this.board.swapAllSymbols(targetSymbol);
+    this.state.board = this.board.getBoard();
+    
+    console.log(`Symbol swap used - replaced all ${targetSymbol} symbols`);
+    
+    // Check for new matches after the symbol swap
+    const newMatches = this.board.findMatches();
+    if (newMatches.length > 0) {
+      await this.processMatches(newMatches, false, false);
+    }
+  }
+
   private calculateProgressIncrease(matchLength: number): number {
     const numerator = matchLength >= 5 ? 
       MATCH_PROGRESS_NUMERATORS[5] : 
@@ -467,8 +678,17 @@ export class Game {
   private checkLevelCompletion(): void {
     if (this.state.level.progress >= 1 && this.state.timer.timeRemaining > 0) {
       this.state.timer.isActive = false;
+      
+      // Award Clear Cells power-ups based on remaining time
+      const remainingTimeInSeconds = this.state.timer.timeRemaining / 1000;
+      const clearCellsToAward = remainingTimeInSeconds > 60 ? 2 : 1;
+      
+      for (let i = 0; i < clearCellsToAward; i++) {
+        this.awardPowerUp(PowerUpType.CLEAR_CELLS);
+      }
+      
       this.state.showLevelCompletionPopup = true;
-      console.log(`Level ${this.state.level.currentLevel} completed!`);
+      console.log(`Level ${this.state.level.currentLevel} completed! Awarded ${clearCellsToAward} Clear Cells power-ups.`);
     }
   }
 

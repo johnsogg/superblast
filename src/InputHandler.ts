@@ -1,10 +1,12 @@
-import { Position } from './types';
+import { Position, PowerUpType } from './types';
 import { Renderer } from './Renderer';
 
 export interface InputEvents {
   onCellClick: (position: Position) => void;
   onCellDrag: (from: Position, to: Position) => void;
   onDragUpdate?: (from: Position, to: Position | null, mousePos: { x: number; y: number } | null) => void;
+  onPowerUpDrag: (powerUpType: PowerUpType, targetPosition: Position) => void;
+  onPowerUpDragUpdate?: (powerUpType: PowerUpType, targetPosition: Position | null, mousePos: { x: number; y: number } | null) => void;
 }
 
 export class InputHandler {
@@ -14,6 +16,8 @@ export class InputHandler {
   private isDragging: boolean = false;
   private dragStart: Position | null = null;
   private mousePosition: { x: number; y: number } | null = null;
+  private isPowerUpDragging: boolean = false;
+  private powerUpDragType: PowerUpType | null = null;
 
   constructor(canvas: HTMLCanvasElement, renderer: Renderer, events: InputEvents) {
     this.canvas = canvas;
@@ -32,6 +36,60 @@ export class InputHandler {
     this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
     this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
     this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
+    
+    // Power-up drag event listeners
+    this.setupPowerUpListeners();
+  }
+
+  private setupPowerUpListeners(): void {
+    const powerUpItems = document.querySelectorAll('.power-up-item');
+    
+    powerUpItems.forEach(item => {
+      const powerUpType = item.getAttribute('data-type') as PowerUpType;
+      
+      item.addEventListener('mousedown', (event) => {
+        const powerUpItem = event.currentTarget as HTMLElement;
+        const count = parseInt(powerUpItem.querySelector('.power-up-count')?.textContent || '0');
+        
+        if (count > 0) {
+          this.isPowerUpDragging = true;
+          this.powerUpDragType = powerUpType;
+          powerUpItem.classList.add('dragging');
+          event.preventDefault();
+        }
+      });
+      
+      document.addEventListener('mousemove', (event) => {
+        if (this.isPowerUpDragging && this.powerUpDragType) {
+          const rect = this.canvas.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          
+          const position = this.renderer.getPositionFromPixel(x, y);
+          if (this.events.onPowerUpDragUpdate) {
+            this.events.onPowerUpDragUpdate(this.powerUpDragType, position, { x, y });
+          }
+        }
+      });
+      
+      document.addEventListener('mouseup', (event) => {
+        if (this.isPowerUpDragging && this.powerUpDragType) {
+          const rect = this.canvas.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          
+          const position = this.renderer.getPositionFromPixel(x, y);
+          if (position) {
+            this.events.onPowerUpDrag(this.powerUpDragType, position);
+          }
+          
+          // Reset power-up drag state
+          powerUpItems.forEach(pi => pi.classList.remove('dragging'));
+          this.isPowerUpDragging = false;
+          this.powerUpDragType = null;
+        }
+      });
+    });
   }
 
   private handleMouseDown(event: MouseEvent): void {

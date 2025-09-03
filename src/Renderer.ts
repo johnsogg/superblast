@@ -1,4 +1,4 @@
-import { SymbolType, Cell, Position, SYMBOL_COLORS, BOARD_WIDTH, BOARD_HEIGHT, DragState, SwapAnimation, MatchAnimation } from './types';
+import { SymbolType, Cell, Position, SYMBOL_COLORS, BOARD_WIDTH, BOARD_HEIGHT, DragState, SwapAnimation, MatchAnimation, PowerUpDragState } from './types';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -37,10 +37,10 @@ export class Renderer {
     this.offsetY = (height - totalGridHeight) / 2;
   }
 
-  public render(board: Cell[][], selectedCell: Position | null = null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = []): void {
+  public render(board: Cell[][], selectedCell: Position | null = null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = [], greenCell: Position | null = null, powerUpDragState: PowerUpDragState | null = null): void {
     this.clearCanvas();
     this.renderGrid();
-    this.renderBoard(board, selectedCell, dragInfo, swapAnimation, matchAnimations);
+    this.renderBoard(board, selectedCell, dragInfo, swapAnimation, matchAnimations, greenCell);
     
     // Render match animations on top
     matchAnimations.forEach(animation => {
@@ -50,6 +50,11 @@ export class Renderer {
     // Render drag preview if dragging
     if (dragInfo) {
       this.renderDragPreview(dragInfo, board);
+    }
+    
+    // Render power-up drag preview
+    if (powerUpDragState) {
+      this.renderPowerUpDragPreview(powerUpDragState);
     }
   }
 
@@ -100,13 +105,14 @@ export class Renderer {
     }
   }
 
-  private renderBoard(board: Cell[][], selectedCell: Position | null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = []): void {
+  private renderBoard(board: Cell[][], selectedCell: Position | null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = [], greenCell: Position | null = null): void {
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
         const position = { x, y };
         const isSelected = selectedCell && selectedCell.x === x && selectedCell.y === y;
         const isDraggedCell = dragInfo && dragInfo.from.x === x && dragInfo.from.y === y;
+        const isGreenCell = greenCell && greenCell.x === x && greenCell.y === y;
         
         // Check if this cell is part of a match animation
         const isAnimatingMatch = matchAnimations.some(animation => 
@@ -133,7 +139,7 @@ export class Renderer {
           }
         }
         
-        this.renderCell(cell, isSelected || false, renderPosition);
+        this.renderCell(cell, isSelected || false, renderPosition, isGreenCell || false);
       }
     }
   }
@@ -152,11 +158,20 @@ export class Renderer {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
-  private renderCell(cell: Cell, isSelected: boolean, renderPosition?: Position): void {
+  private renderCell(cell: Cell, isSelected: boolean, renderPosition?: Position, isGreenCell: boolean = false): void {
     // Use renderPosition if provided, otherwise use cell's position
     const pos = renderPosition || cell.position;
     const pixelX = this.offsetX + pos.x * this.cellSize;
     const pixelY = this.offsetY + pos.y * this.cellSize;
+    
+    // Highlight green cell (free swap target)
+    if (isGreenCell) {
+      this.ctx.fillStyle = 'rgba(74, 222, 128, 0.6)';
+      this.ctx.fillRect(pixelX, pixelY, this.cellSize, this.cellSize);
+      this.ctx.strokeStyle = '#4ade80';
+      this.ctx.lineWidth = 4;
+      this.ctx.strokeRect(pixelX, pixelY, this.cellSize, this.cellSize);
+    }
     
     // Highlight selected cell
     if (isSelected) {
@@ -326,5 +341,44 @@ export class Renderer {
     
     // Restore context state
     this.ctx.restore();
+  }
+
+  private renderPowerUpDragPreview(powerUpDragState: PowerUpDragState): void {
+    if (powerUpDragState.targetCell) {
+      const pixelX = this.offsetX + powerUpDragState.targetCell.x * this.cellSize;
+      const pixelY = this.offsetY + powerUpDragState.targetCell.y * this.cellSize;
+      
+      // Highlight target cell based on power-up type
+      switch (powerUpDragState.powerUpType) {
+        case 'free_swap':
+          this.ctx.strokeStyle = '#4ade80';
+          this.ctx.lineWidth = 3;
+          this.ctx.strokeRect(pixelX, pixelY, this.cellSize, this.cellSize);
+          break;
+        case 'clear_cells':
+          // Highlight the 3x3 area around the target
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+              const x = powerUpDragState.targetCell.x + dx;
+              const y = powerUpDragState.targetCell.y + dy;
+              
+              if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
+                const cellPixelX = this.offsetX + x * this.cellSize;
+                const cellPixelY = this.offsetY + y * this.cellSize;
+                
+                this.ctx.strokeStyle = '#eab308';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(cellPixelX, cellPixelY, this.cellSize, this.cellSize);
+              }
+            }
+          }
+          break;
+        case 'symbol_swap':
+          this.ctx.strokeStyle = '#8b5cf6';
+          this.ctx.lineWidth = 3;
+          this.ctx.strokeRect(pixelX, pixelY, this.cellSize, this.cellSize);
+          break;
+      }
+    }
   }
 }
