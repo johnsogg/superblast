@@ -2,6 +2,7 @@ import { GameBoard } from './GameBoard';
 import { Renderer } from './Renderer';
 import { InputHandler } from './InputHandler';
 import { AudioUtils } from './AudioUtils';
+import { LevelMap } from './LevelMap';
 import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction, PowerUpType } from './types';
 
 export class Game {
@@ -10,6 +11,7 @@ export class Game {
   // @ts-expect-error Used for event handling but not directly referenced
   private inputHandler: InputHandler;
   private audioUtils: AudioUtils;
+  private levelMap: LevelMap;
   private state: GameState;
   private dragState: DragState | null = null;
   private canvas: HTMLCanvasElement;
@@ -63,6 +65,7 @@ export class Game {
     this.timerElement = document.getElementById('timer-display')!;
     this.progressBarElement = document.getElementById('progress-bar')!;
     this.levelCompletionModalElement = document.getElementById('level-completion-modal')!;
+    const levelsSectionElement = document.getElementById('levels-section')!;
     
     this.powerUpElements = {
       freeSwap: document.getElementById('free-swap-count')!,
@@ -77,6 +80,22 @@ export class Game {
     if (!this.powerUpElements.freeSwap || !this.powerUpElements.clearCells || !this.powerUpElements.symbolSwap) {
       throw new Error('Could not find required power-up UI elements');
     }
+    
+    if (!levelsSectionElement) {
+      throw new Error('Could not find levels section element');
+    }
+
+    // Initialize level map
+    const levelMapContainer = levelsSectionElement.querySelector('.level-map-container') as HTMLElement;
+    if (!levelMapContainer) {
+      throw new Error('Could not find level map container element');
+    }
+    this.levelMap = new LevelMap(levelMapContainer);
+    this.levelMap.updateState({
+      currentLevel: this.state.level.currentLevel,
+      completedLevels: [],
+      maxUnlockedLevel: this.state.level.currentLevel,
+    });
 
     // Set up modal button event listeners
     this.setupModalEventListeners();
@@ -536,13 +555,15 @@ export class Game {
         this.startNextLevel();
         break;
       case PopupAction.LEVEL_MAP:
-        // TODO: Show level map
-        console.log('Level map button clicked - not implemented yet');
+        this.showLevelMapModal();
         break;
     }
   }
 
   private startNextLevel(): void {
+    // Mark current level as completed
+    const completedLevel = this.state.level.currentLevel;
+    
     // Hide the completion popup
     this.state.showLevelCompletionPopup = false;
 
@@ -563,7 +584,38 @@ export class Game {
     this.state.timer.isActive = true;
     this.state.timer.startTime = performance.now();
 
+    // Update level map with completed levels and new current level
+    const completedLevels = [...(this.levelMap?.getCompletedLevels() || []), completedLevel];
+    this.levelMap?.updateState({
+      currentLevel: this.state.level.currentLevel,
+      completedLevels,
+      maxUnlockedLevel: this.state.level.currentLevel,
+    });
+
     console.log(`Started level ${this.state.level.currentLevel}`);
+  }
+
+  private showLevelMapModal(): void {
+    // For now, we'll just focus the level map in the right panel
+    // In a future version, this could open a larger modal with the level map
+    const levelsSectionElement = document.getElementById('levels-section');
+    if (levelsSectionElement) {
+      // Scroll the level map into view and add a temporary highlight
+      levelsSectionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      levelsSectionElement.style.outline = '3px solid #4ade80';
+      levelsSectionElement.style.borderRadius = '8px';
+      
+      // Remove the highlight after a short delay
+      setTimeout(() => {
+        levelsSectionElement.style.outline = '';
+        levelsSectionElement.style.borderRadius = '';
+      }, 2000);
+    }
+    
+    // Hide the completion popup since user clicked the level map button
+    this.state.showLevelCompletionPopup = false;
+    
+    console.log('Level map highlighted in right panel');
   }
 
   private awardPowerUp(type: PowerUpType): void {

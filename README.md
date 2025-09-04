@@ -66,3 +66,11 @@ There are three power-ups:
    A Symbol Swap power-up looks like a rectangle with a triangle on top and
    another on the bottom, with three circles inside the rectangle. Rectangle is
    purple, the triangles are white, and the circle is yellow.
+
+   ## Level Map
+
+   The level map is the last item in the panel on the right side of the screen. It looks different depending on what level you are on.
+
+   Levels 1 to 5: it looks like ![hand made sketch of levels 1 to 5](img/level-map.jpg).
+
+   Levels 6 to 10 it looks like ![hand made sketch of levels 6 to 10](img/level-map-6-10.JPG).
