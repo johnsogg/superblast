@@ -67,10 +67,31 @@ There are three power-ups:
    another on the bottom, with three circles inside the rectangle. Rectangle is
    purple, the triangles are white, and the circle is yellow.
 
-   ## Level Map
+## Level Map
 
-   The level map is the last item in the panel on the right side of the screen. It looks different depending on what level you are on.
+The level map is the last item in the panel on the right side of the screen. It looks different depending on what level
+you are on.
 
-   Levels 1 to 5: it looks like ![hand made sketch of levels 1 to 5](img/level-map.jpg).
+Levels 1 to 5: it looks like ![hand made sketch of levels 1 to 5](img/level-map.jpg).
 
-   Levels 6 to 10 it looks like ![hand made sketch of levels 6 to 10](img/level-map-6-10.JPG).
+Levels 6 to 10 it looks like ![hand made sketch of
+ levels 6 to 10](img/level-map-6-10.JPG).
+
+## Home Screen
+
+The Home Screen looks like this:
+
+![Home Screen](img/super-blast-home-screen.jpg)
+
+At left are the five symbols, just as a sort of branding op. Shows the cast of
+characters.
+
+Middle is Super Blast with the "super" written large and the "blast" written
+inside a cloud shape.
+
+Below that are two buttons: Play and Learn, and between them is Level X, where X
+is the highest level you've unlocked so far.
+
+The Play button will take you to the level menu.
+
+## Level menu

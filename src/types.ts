@@ -26,16 +26,20 @@ export interface GameState {
   timer: TimerState;
   level: LevelState;
   showLevelCompletionPopup: boolean;
+  showLevelFailedPopup: boolean;
   powerUps: PowerUp[];
   powerUpDragState: PowerUpDragState | null;
   activePowerUp: PowerUpType | null;
   greenCell: Position | null;
+  isPaused: boolean;
+  showPausePopup: boolean;
 }
 
 export interface TimerState {
   timeRemaining: number; // in milliseconds
   isActive: boolean;
   startTime: number; // performance.now() when timer started
+  pausedTime: number; // total time spent paused in milliseconds
 }
 
 export interface LevelState {
@@ -44,10 +48,18 @@ export interface LevelState {
   progressDenominator: number; // the denominator for this level
 }
 
+export enum AppState {
+  HOME = 'home',
+  GAME = 'game',
+  LEVEL_SELECT = 'level_select',
+}
+
 export enum PopupAction {
   HOME = 'home',
   PLAY_NEXT = 'play_next',
   LEVEL_MAP = 'level_map',
+  RESUME = 'resume',
+  RESTART_LEVEL = 'restart_level',
 }
 
 export enum PowerUpType {

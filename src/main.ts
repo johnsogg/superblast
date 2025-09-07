@@ -1,4 +1,4 @@
-import { Game } from './Game';
+import { App } from './App';
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 
@@ -11,14 +11,15 @@ const uiColumnWidth = 300;
 canvas.width = Math.max(400, window.innerWidth - uiColumnWidth);
 canvas.height = window.innerHeight;
 
-// Initialize and start the game
-const game = new Game(canvas);
+// Initialize the app (starts on home screen)
+console.log('🚀 MAIN: Initializing App...');
+const app = new App(canvas);
 
-console.log('Superblast game initialized!');
+console.log('🚀 MAIN: Superblast app initialized!');
 
 // Handle cleanup on page unload
 window.addEventListener('beforeunload', () => {
-  game.destroy();
+  app.destroy();
 });
 
 export {};

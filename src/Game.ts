@@ -16,17 +16,27 @@ export class Game {
   private dragState: DragState | null = null;
   private canvas: HTMLCanvasElement;
   private animationId: number | null = null;
+  private pauseStartTime: number | null = null;
   private scoreElement: HTMLElement;
   private timerElement: HTMLElement;
   private progressBarElement: HTMLElement;
   private levelCompletionModalElement: HTMLElement;
+  private pauseModalElement: HTMLElement;
+  private levelFailedModalElement: HTMLElement;
+  private pauseButtonElement: HTMLElement;
+  private gameStarted: boolean = false;
+  private gameScreenVisible: boolean = false;
+  private levelStartTime: number = 0;
+  private timerInitialized: boolean = false;
   private powerUpElements: {
     freeSwap: HTMLElement;
     clearCells: HTMLElement;
     symbolSwap: HTMLElement;
   };
+  private homeCallback: (() => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, startingLevel: number = 1) {
+    console.log(`🎮 GAME CONSTRUCTOR: Starting level ${startingLevel}`);
     this.canvas = canvas;
     this.board = new GameBoard();
     this.renderer = new Renderer(canvas);
@@ -41,15 +51,17 @@ export class Game {
       matchAnimations: [],
       timer: {
         timeRemaining: 120000, // 2 minutes in milliseconds
-        isActive: true,
-        startTime: performance.now(),
+        isActive: false, // Start inactive to prevent false level failed on startup
+        startTime: 0,
+        pausedTime: 0,
       },
       level: {
-        currentLevel: 1,
+        currentLevel: startingLevel,
         progress: 0,
-        progressDenominator: LEVEL_DENOMINATORS[1],
+        progressDenominator: LEVEL_DENOMINATORS[Math.min(startingLevel, 10) as keyof typeof LEVEL_DENOMINATORS] || LEVEL_DENOMINATORS[10],
       },
       showLevelCompletionPopup: false,
+      showLevelFailedPopup: false,
       powerUps: [
         { type: PowerUpType.FREE_SWAP, count: 0 },
         { type: PowerUpType.CLEAR_CELLS, count: 0 },
@@ -58,13 +70,20 @@ export class Game {
       powerUpDragState: null,
       activePowerUp: null,
       greenCell: null,
+      isPaused: false,
+      showPausePopup: false,
     };
+    
+    console.log(`🎮 GAME CONSTRUCTOR: Initial state showLevelFailedPopup = ${this.state.showLevelFailedPopup}`);
 
     // Get UI elements
     this.scoreElement = document.getElementById('score-display')!;
     this.timerElement = document.getElementById('timer-display')!;
     this.progressBarElement = document.getElementById('progress-bar')!;
     this.levelCompletionModalElement = document.getElementById('level-completion-modal')!;
+    this.pauseModalElement = document.getElementById('pause-modal')!;
+    this.levelFailedModalElement = document.getElementById('level-failed-modal')!;
+    this.pauseButtonElement = document.getElementById('pause-button')!;
     const levelsSectionElement = document.getElementById('levels-section')!;
     
     this.powerUpElements = {
@@ -73,7 +92,7 @@ export class Game {
       symbolSwap: document.getElementById('symbol-swap-count')!,
     };
     
-    if (!this.scoreElement || !this.timerElement || !this.progressBarElement || !this.levelCompletionModalElement) {
+    if (!this.scoreElement || !this.timerElement || !this.progressBarElement || !this.levelCompletionModalElement || !this.pauseModalElement || !this.levelFailedModalElement || !this.pauseButtonElement) {
       throw new Error('Could not find required UI elements');
     }
     
@@ -99,6 +118,8 @@ export class Game {
 
     // Set up modal button event listeners
     this.setupModalEventListeners();
+    this.setupPauseButton();
+    this.setupKeyboardEventListeners();
 
     this.inputHandler = new InputHandler(canvas, this.renderer, {
       onCellClick: this.handleCellClick.bind(this),
@@ -109,6 +130,7 @@ export class Game {
     });
 
     this.setupResizeHandler();
+    console.log(`🎮 GAME CONSTRUCTOR: Starting game loop...`);
     this.gameLoop();
   }
 
@@ -121,9 +143,60 @@ export class Game {
     });
   }
 
+  private setupKeyboardEventListeners(): void {
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.togglePause();
+      }
+    });
+  }
+
+  private setupPauseButton(): void {
+    this.pauseButtonElement.addEventListener('click', () => {
+      this.togglePause();
+    });
+  }
+
+  private togglePause(): void {
+    // Don't allow pausing during animations or if level completion popup is shown
+    if (this.state.isSwapping || this.state.matchAnimations.length > 0 || this.state.showLevelCompletionPopup || this.state.showLevelFailedPopup) {
+      return;
+    }
+
+    // Don't allow pausing if timer is already inactive (level completed or time expired)
+    if (!this.state.timer.isActive) {
+      return;
+    }
+
+    const now = performance.now();
+
+    if (this.state.isPaused) {
+      // Resume: calculate how long we were paused and add to total paused time
+      const pauseDuration = now - this.pauseStartTime!;
+      this.state.timer.pausedTime += pauseDuration;
+      this.state.isPaused = false;
+      this.state.showPausePopup = false;
+      this.pauseStartTime = null;
+      console.log('Game resumed');
+    } else {
+      // Pause: stop timer and show pause popup
+      this.pauseStartTime = now;
+      this.state.isPaused = true;
+      this.state.showPausePopup = true;
+      console.log('Game paused');
+    }
+  }
+
   private gameLoop(): void {
+    // Always update animations and render for visual feedback
     this.updateAnimations();
-    this.updateTimer();
+    
+    // Only update timer when not paused
+    if (!this.state.isPaused) {
+      this.updateTimer();
+    }
+    
     this.render();
     this.animationId = requestAnimationFrame(() => this.gameLoop());
   }
@@ -170,7 +243,7 @@ export class Game {
   }
 
   private async handleCellClick(position: Position): Promise<void> {
-    if (this.state.isSwapping) {
+    if (this.state.isSwapping || this.state.isPaused) {
       return;
     }
     
@@ -206,7 +279,7 @@ export class Game {
   }
 
   private async handleCellDrag(from: Position, to: Position): Promise<void> {
-    if (this.state.isSwapping) {
+    if (this.state.isSwapping || this.state.isPaused) {
       return;
     }
 
@@ -325,7 +398,7 @@ export class Game {
   }
 
   private handleDragUpdate(from: Position, to: Position | null, mousePos: { x: number; y: number } | null): void {
-    if (this.state.isSwapping) {
+    if (this.state.isSwapping || this.state.isPaused) {
       return;
     }
     
@@ -493,19 +566,30 @@ export class Game {
   }
 
   private updateTimer(): void {
+    // Don't do anything with timer until game is properly started
+    if (!this.gameStarted) {
+      return;
+    }
+
     if (!this.state.timer.isActive) {
       return;
     }
 
     const now = performance.now();
-    const elapsed = now - this.state.timer.startTime;
+    const elapsed = now - this.state.timer.startTime - this.state.timer.pausedTime;
     this.state.timer.timeRemaining = Math.max(0, 120000 - elapsed);
 
     if (this.state.timer.timeRemaining === 0) {
       this.state.timer.isActive = false;
-      // Timer expired - we'll implement timer expiry logic later
-      console.log('Timer expired!');
+      this.checkLevelFailure();
     }
+  }
+
+  private startGameTimer(): void {
+    this.state.timer.isActive = true;
+    this.state.timer.startTime = performance.now();
+    this.levelStartTime = performance.now();
+    console.log('Game timer started');
   }
 
   private updateUI(): void {
@@ -522,11 +606,40 @@ export class Game {
     const progressPercentage = Math.min(this.state.level.progress * 100, 100);
     this.progressBarElement.style.width = `${progressPercentage}%`;
 
-    // Show/hide level completion modal
-    if (this.state.showLevelCompletionPopup) {
-      this.levelCompletionModalElement.classList.add('show');
+    console.log(`🎮 UPDATE UI: gameScreenVisible=${this.gameScreenVisible}, showLevelFailedPopup=${this.state.showLevelFailedPopup}`);
+
+    // Only show/hide modals when game screen is visible
+    if (this.gameScreenVisible) {
+      console.log(`🎮 UPDATE UI: Game screen is visible, processing modals...`);
+      
+      // Show/hide level completion modal
+      if (this.state.showLevelCompletionPopup) {
+        this.levelCompletionModalElement.classList.add('show');
+      } else {
+        this.levelCompletionModalElement.classList.remove('show');
+      }
+
+      // Show/hide pause modal
+      if (this.state.showPausePopup) {
+        this.pauseModalElement.classList.add('show');
+      } else {
+        this.pauseModalElement.classList.remove('show');
+      }
+
+      // Show/hide level failed modal
+      if (this.state.showLevelFailedPopup) {
+        console.log(`🚨 UPDATE UI: SHOWING Level Failed modal! State=${this.state.showLevelFailedPopup}`);
+        this.levelFailedModalElement.classList.add('show');
+      } else {
+        console.log(`✅ UPDATE UI: Hiding Level Failed modal`);
+        this.levelFailedModalElement.classList.remove('show');
+      }
     } else {
+      console.log(`🎮 UPDATE UI: Game screen NOT visible, hiding all modals...`);
+      // Ensure all modals are hidden when game screen is not visible
       this.levelCompletionModalElement.classList.remove('show');
+      this.pauseModalElement.classList.remove('show');
+      this.levelFailedModalElement.classList.remove('show');
     }
 
     // Update power-up counts
@@ -536,8 +649,27 @@ export class Game {
   }
 
   private setupModalEventListeners(): void {
-    const buttons = this.levelCompletionModalElement.querySelectorAll('.modal-button');
-    buttons.forEach(button => {
+    // Level completion modal buttons
+    const levelButtons = this.levelCompletionModalElement.querySelectorAll('.modal-button');
+    levelButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        const action = (e.currentTarget as HTMLElement).getAttribute('data-action') as PopupAction;
+        this.handleModalAction(action);
+      });
+    });
+
+    // Pause modal buttons
+    const pauseButtons = this.pauseModalElement.querySelectorAll('.modal-button');
+    pauseButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        const action = (e.currentTarget as HTMLElement).getAttribute('data-action') as PopupAction;
+        this.handleModalAction(action);
+      });
+    });
+
+    // Level failed modal buttons
+    const levelFailedButtons = this.levelFailedModalElement.querySelectorAll('.modal-button');
+    levelFailedButtons.forEach(button => {
       button.addEventListener('click', (e) => {
         const action = (e.currentTarget as HTMLElement).getAttribute('data-action') as PopupAction;
         this.handleModalAction(action);
@@ -548,14 +680,36 @@ export class Game {
   private handleModalAction(action: PopupAction): void {
     switch (action) {
       case PopupAction.HOME:
-        // TODO: Navigate to home screen
-        console.log('Home button clicked - not implemented yet');
+        if (this.homeCallback) {
+          console.log('Home button clicked - navigating to home screen');
+          // Hide any open modals before returning home
+          this.state.showLevelCompletionPopup = false;
+          this.state.showPausePopup = false;
+          this.state.showLevelFailedPopup = false;
+          this.state.isPaused = false;
+          this.pauseStartTime = null;
+          // Clear any active power-up states
+          this.state.activePowerUp = null;
+          this.state.greenCell = null;
+          this.state.powerUpDragState = null;
+          // Update UI to immediately hide modals
+          this.updateUI();
+          this.homeCallback();
+        } else {
+          console.log('Home button clicked - no home callback set');
+        }
         break;
       case PopupAction.PLAY_NEXT:
         this.startNextLevel();
         break;
       case PopupAction.LEVEL_MAP:
         this.showLevelMapModal();
+        break;
+      case PopupAction.RESUME:
+        this.togglePause();
+        break;
+      case PopupAction.RESTART_LEVEL:
+        this.restartLevel();
         break;
     }
   }
@@ -566,6 +720,7 @@ export class Game {
     
     // Hide the completion popup
     this.state.showLevelCompletionPopup = false;
+    this.state.showLevelFailedPopup = false;
 
     // Advance to next level
     this.state.level.currentLevel++;
@@ -579,10 +734,19 @@ export class Game {
     // Reset progress
     this.state.level.progress = 0;
 
-    // Reset timer
+    // Reset timer (start inactive, will be activated after delay)
     this.state.timer.timeRemaining = 120000;
-    this.state.timer.isActive = true;
-    this.state.timer.startTime = performance.now();
+    this.state.timer.isActive = false;
+    this.state.timer.startTime = 0;
+    this.state.timer.pausedTime = 0;
+    this.gameStarted = false; // Reset game started flag
+    this.levelStartTime = 0; // Reset level start time
+    this.timerInitialized = false; // Reset timer initialization flag
+
+    // Reset pause state
+    this.state.isPaused = false;
+    this.state.showPausePopup = false;
+    this.pauseStartTime = null;
 
     // Update level map with completed levels and new current level
     const completedLevels = [...(this.levelMap?.getCompletedLevels() || []), completedLevel];
@@ -593,6 +757,45 @@ export class Game {
     });
 
     console.log(`Started level ${this.state.level.currentLevel}`);
+  }
+
+  private restartLevel(): void {
+    console.log(`Restarting Level ${this.state.level.currentLevel}`);
+    
+    // Hide the level failed popup
+    this.state.showLevelFailedPopup = false;
+    
+    // Reset level progress
+    this.state.level.progress = 0;
+    
+    // Reset timer (start inactive, will be activated after delay)
+    this.state.timer.timeRemaining = 120000; // 2 minutes
+    this.state.timer.isActive = false;
+    this.state.timer.startTime = 0;
+    this.state.timer.pausedTime = 0;
+    this.pauseStartTime = null;
+    this.gameStarted = false; // Reset game started flag
+    this.levelStartTime = 0; // Reset level start time
+    this.timerInitialized = false; // Reset timer initialization flag
+    
+    // Clear pause state
+    this.state.isPaused = false;
+    this.state.showPausePopup = false;
+    
+    // Clear any active power-up states
+    this.state.activePowerUp = null;
+    this.state.greenCell = null;
+    this.state.powerUpDragState = null;
+    
+    // Reset board and animations
+    this.board = new GameBoard();
+    this.state.board = this.board.getBoard();
+    this.state.selectedCell = null;
+    this.state.isSwapping = false;
+    this.state.swapAnimation = null;
+    this.state.matchAnimations = [];
+    
+    console.log(`Level ${this.state.level.currentLevel} restarted`);
   }
 
   private showLevelMapModal(): void {
@@ -641,7 +844,7 @@ export class Game {
   }
 
   private handlePowerUpDrag(powerUpType: PowerUpType, targetPosition: Position): void {
-    if (this.state.isSwapping) {
+    if (this.state.isSwapping || this.state.isPaused) {
       return;
     }
 
@@ -668,6 +871,10 @@ export class Game {
   }
 
   private handlePowerUpDragUpdate(powerUpType: PowerUpType, targetPosition: Position | null, mousePos: { x: number; y: number } | null): void {
+    if (this.state.isPaused) {
+      return;
+    }
+    
     this.state.powerUpDragState = targetPosition ? {
       powerUpType,
       mousePosition: mousePos || { x: 0, y: 0 },
@@ -739,9 +946,71 @@ export class Game {
         this.awardPowerUp(PowerUpType.CLEAR_CELLS);
       }
       
+      // Save the next level as unlocked (completing level N unlocks level N+1)
+      const nextLevel = this.state.level.currentLevel + 1;
+      const highestLevel = Math.max(nextLevel, this.getHighestLevelReached());
+      localStorage.setItem('superblast_highest_level', highestLevel.toString());
+      
       this.state.showLevelCompletionPopup = true;
-      console.log(`Level ${this.state.level.currentLevel} completed! Awarded ${clearCellsToAward} Clear Cells power-ups.`);
+      console.log(`Level ${this.state.level.currentLevel} completed! Next level ${nextLevel} unlocked. Awarded ${clearCellsToAward} Clear Cells power-ups.`);
     }
+  }
+
+  private checkLevelFailure(): void {
+    console.log(`🚨 CHECK LEVEL FAILURE CALLED: progress=${this.state.level.progress.toFixed(2)}, timeRemaining=${this.state.timer.timeRemaining}, gameStarted=${this.gameStarted}, gameScreenVisible=${this.gameScreenVisible}, timerInitialized=${this.timerInitialized}`);
+    
+    // COMPREHENSIVE SAFETY CHECKS - ALL must be true to show Level Failed
+    
+    // Check 1: Basic game state requirements
+    if (this.state.level.progress >= 1) {
+      console.log('Level failure check: Level already completed');
+      return;
+    }
+    
+    if (this.state.timer.timeRemaining > 0) {
+      console.log('Level failure check: Timer still has time remaining');
+      return;
+    }
+    
+    // Check 2: Game initialization state
+    if (!this.gameStarted) {
+      console.log('Level failure check: Game not started yet');
+      return;
+    }
+    
+    if (!this.gameScreenVisible) {
+      console.log('Level failure check: Game screen not visible');
+      return;
+    }
+    
+    if (!this.timerInitialized) {
+      console.log('Level failure check: Timer not initialized yet');
+      return;
+    }
+    
+    // Check 3: Time-based safety checks
+    if (this.levelStartTime === 0) {
+      console.log('Level failure check: Level start time not set');
+      return;
+    }
+    
+    const timeSinceLevelStart = performance.now() - this.levelStartTime;
+    if (timeSinceLevelStart < 5000) { // 5 seconds minimum
+      console.log(`Level failure check: Only ${Math.round(timeSinceLevelStart/1000)}s since level start, need 5s minimum`);
+      return;
+    }
+    
+    // Check 4: Timer state validation
+    if (this.state.timer.startTime === 0) {
+      console.log('Level failure check: Timer start time not set');
+      return;
+    }
+    
+    // ALL CHECKS PASSED - Show Level Failed
+    this.state.timer.isActive = false;
+    console.log(`🚨💥 SETTING showLevelFailedPopup = true! This should trigger the modal to show.`);
+    this.state.showLevelFailedPopup = true;
+    console.log(`Level ${this.state.level.currentLevel} LEGITIMATELY FAILED! Progress: ${(this.state.level.progress * 100).toFixed(1)}% after ${Math.round(timeSinceLevelStart/1000)}s`);
   }
 
   public destroy(): void {
@@ -756,5 +1025,45 @@ export class Game {
 
   public getBoard(): GameBoard {
     return this.board;
+  }
+
+  public setHomeCallback(callback: () => void): void {
+    this.homeCallback = callback;
+  }
+
+  public setGameScreenVisible(visible: boolean): void {
+    console.log(`🎮 SET GAME SCREEN VISIBLE: ${visible} (was ${this.gameScreenVisible}), timerInitialized=${this.timerInitialized}`);
+    this.gameScreenVisible = visible;
+    if (visible && !this.timerInitialized) {
+      console.log(`🎮 SET GAME SCREEN VISIBLE: Starting timer in 1 second...`);
+      // Start the timer when game screen becomes visible for the first time
+      setTimeout(() => {
+        console.log(`🎮 TIMER TIMEOUT EXECUTED: Setting gameStarted=true, starting timer`);
+        this.gameStarted = true;
+        this.startGameTimer();
+        this.timerInitialized = true;
+        console.log('Timer started after game screen became visible');
+      }, 1000); // 1 second delay to ensure proper initialization
+    } else if (!visible) {
+      console.log(`🎮 SET GAME SCREEN VISIBLE: Hiding all modals because screen not visible`);
+      // Hide all modals when game screen is not visible
+      this.state.showLevelCompletionPopup = false;
+      this.state.showPausePopup = false;
+      this.state.showLevelFailedPopup = false;
+      this.updateUI();
+    }
+  }
+
+  public getCurrentLevel(): number {
+    return this.state.level.currentLevel;
+  }
+
+  public getHighestLevelReached(): number {
+    return Game.getHighestLevelReached();
+  }
+
+  public static getHighestLevelReached(): number {
+    const saved = localStorage.getItem('superblast_highest_level');
+    return saved ? parseInt(saved, 10) : 1;
   }
 }
