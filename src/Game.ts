@@ -3,6 +3,7 @@ import { Renderer } from './Renderer';
 import { InputHandler } from './InputHandler';
 import { AudioUtils } from './AudioUtils';
 import { LevelMap } from './LevelMap';
+import { DebugUtils } from './DebugUtils';
 import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction, PowerUpType } from './types';
 
 export class Game {
@@ -36,7 +37,6 @@ export class Game {
   private homeCallback: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, startingLevel: number = 1) {
-    console.log(`🎮 GAME CONSTRUCTOR: Starting level ${startingLevel}`);
     this.canvas = canvas;
     this.board = new GameBoard();
     this.renderer = new Renderer(canvas);
@@ -73,8 +73,6 @@ export class Game {
       isPaused: false,
       showPausePopup: false,
     };
-    
-    console.log(`🎮 GAME CONSTRUCTOR: Initial state showLevelFailedPopup = ${this.state.showLevelFailedPopup}`);
 
     // Get UI elements
     this.scoreElement = document.getElementById('score-display')!;
@@ -130,17 +128,41 @@ export class Game {
     });
 
     this.setupResizeHandler();
-    console.log(`🎮 GAME CONSTRUCTOR: Starting game loop...`);
+    
+    // Ensure canvas size is correct on initialization
+    this.updateCanvasSize();
+    
     this.gameLoop();
   }
 
   private setupResizeHandler(): void {
     window.addEventListener('resize', () => {
-      this.canvas.width = window.innerWidth;
-      this.canvas.height = window.innerHeight;
+      this.updateCanvasSize();
       this.renderer.calculateDimensions();
       this.render();
     });
+  }
+
+  private updateCanvasSize(): void {
+    // Use the same sizing logic as main.ts to ensure consistency
+    const uiColumnWidth = 300;
+    const newWidth = Math.max(400, window.innerWidth - uiColumnWidth);
+    const newHeight = window.innerHeight;
+    
+    // Only update if dimensions actually changed to avoid unnecessary recalculations
+    if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
+      const oldSize = { width: this.canvas.width, height: this.canvas.height };
+      const newSize = { width: newWidth, height: newHeight };
+      
+      DebugUtils.logCanvasSizeChange(oldSize, newSize, 'resize');
+      
+      this.canvas.width = newWidth;
+      this.canvas.height = newHeight;
+      
+      // Ensure canvas display size matches internal size to prevent coordinate issues
+      this.canvas.style.width = `${newWidth}px`;
+      this.canvas.style.height = `${newHeight}px`;
+    }
   }
 
   private setupKeyboardEventListeners(): void {
@@ -178,13 +200,11 @@ export class Game {
       this.state.isPaused = false;
       this.state.showPausePopup = false;
       this.pauseStartTime = null;
-      console.log('Game resumed');
     } else {
       // Pause: stop timer and show pause popup
       this.pauseStartTime = now;
       this.state.isPaused = true;
       this.state.showPausePopup = true;
-      console.log('Game paused');
     }
   }
 
@@ -249,8 +269,6 @@ export class Game {
     
     // Handle free swap power-up click
     if (this.state.activePowerUp === PowerUpType.FREE_SWAP && this.state.greenCell) {
-      console.log(`Free swap: swapping green cell (${this.state.greenCell.x},${this.state.greenCell.y}) with clicked cell (${position.x},${position.y})`);
-      
       this.state.isSwapping = true;
       this.state.selectedCell = null;
       this.dragState = null;
@@ -285,8 +303,6 @@ export class Game {
 
     // Handle free swap power-up
     if (this.state.activePowerUp === PowerUpType.FREE_SWAP && this.state.greenCell) {
-      console.log(`Free swap: swapping green cell (${this.state.greenCell.x},${this.state.greenCell.y}) with (${to.x},${to.y})`);
-      
       this.state.isSwapping = true;
       this.state.selectedCell = null;
       this.dragState = null;
@@ -310,8 +326,6 @@ export class Game {
       return;
     }
 
-    console.log(`Attempting to swap (${from.x},${from.y}) with (${to.x},${to.y})`);
-    
     this.state.isSwapping = true;
     this.state.selectedCell = null;
     this.dragState = null;
@@ -320,7 +334,6 @@ export class Game {
     const swapSuccessful = this.board.swapCells(from, to);
     
     if (swapSuccessful) {
-      console.log('Swap successful');
       this.audioUtils.playSwapSound();
       
       // Start swap animation
@@ -342,16 +355,12 @@ export class Game {
       const matches = this.board.findMatches();
       
       if (matches.length > 0) {
-        console.log(`Found ${matches.length} matches, processing...`);
         // Process matches and update score - track if chain reaction occurs
         await this.processMatches(matches, true, true);
       } else {
-        console.log('No matches found, will revert after 1 second');
         // No matches found, wait 1 second then swap back with animation
         await this.delayedRevert(from, to);
       }
-    } else {
-      console.log('Swap failed - cells not adjacent');
     }
 
     this.state.isSwapping = false;
@@ -394,7 +403,6 @@ export class Game {
     
     // Update board state after animation
     this.state.board = this.board.getBoard();
-    console.log('Swap reverted');
   }
 
   private handleDragUpdate(from: Position, to: Position | null, mousePos: { x: number; y: number } | null): void {
@@ -476,7 +484,6 @@ export class Game {
       // If this is a cascade after the first direct match, it's a chain reaction
       if (isFirstInChain && !isDirectMatch) {
         this.awardPowerUp(PowerUpType.SYMBOL_SWAP);
-        console.log('Chain reaction detected! Awarded Symbol Swap power-up.');
       }
       await this.processMatches(newMatches, false, false);
     }
@@ -589,7 +596,6 @@ export class Game {
     this.state.timer.isActive = true;
     this.state.timer.startTime = performance.now();
     this.levelStartTime = performance.now();
-    console.log('Game timer started');
   }
 
   private updateUI(): void {
@@ -606,12 +612,8 @@ export class Game {
     const progressPercentage = Math.min(this.state.level.progress * 100, 100);
     this.progressBarElement.style.width = `${progressPercentage}%`;
 
-    console.log(`🎮 UPDATE UI: gameScreenVisible=${this.gameScreenVisible}, showLevelFailedPopup=${this.state.showLevelFailedPopup}`);
-
     // Only show/hide modals when game screen is visible
     if (this.gameScreenVisible) {
-      console.log(`🎮 UPDATE UI: Game screen is visible, processing modals...`);
-      
       // Show/hide level completion modal
       if (this.state.showLevelCompletionPopup) {
         this.levelCompletionModalElement.classList.add('show');
@@ -628,14 +630,11 @@ export class Game {
 
       // Show/hide level failed modal
       if (this.state.showLevelFailedPopup) {
-        console.log(`🚨 UPDATE UI: SHOWING Level Failed modal! State=${this.state.showLevelFailedPopup}`);
         this.levelFailedModalElement.classList.add('show');
       } else {
-        console.log(`✅ UPDATE UI: Hiding Level Failed modal`);
         this.levelFailedModalElement.classList.remove('show');
       }
     } else {
-      console.log(`🎮 UPDATE UI: Game screen NOT visible, hiding all modals...`);
       // Ensure all modals are hidden when game screen is not visible
       this.levelCompletionModalElement.classList.remove('show');
       this.pauseModalElement.classList.remove('show');
@@ -681,7 +680,6 @@ export class Game {
     switch (action) {
       case PopupAction.HOME:
         if (this.homeCallback) {
-          console.log('Home button clicked - navigating to home screen');
           // Hide any open modals before returning home
           this.state.showLevelCompletionPopup = false;
           this.state.showPausePopup = false;
@@ -695,8 +693,6 @@ export class Game {
           // Update UI to immediately hide modals
           this.updateUI();
           this.homeCallback();
-        } else {
-          console.log('Home button clicked - no home callback set');
         }
         break;
       case PopupAction.PLAY_NEXT:
@@ -756,12 +752,9 @@ export class Game {
       maxUnlockedLevel: this.state.level.currentLevel,
     });
 
-    console.log(`Started level ${this.state.level.currentLevel}`);
   }
 
   private restartLevel(): void {
-    console.log(`Restarting Level ${this.state.level.currentLevel}`);
-    
     // Hide the level failed popup
     this.state.showLevelFailedPopup = false;
     
@@ -795,7 +788,6 @@ export class Game {
     this.state.swapAnimation = null;
     this.state.matchAnimations = [];
     
-    console.log(`Level ${this.state.level.currentLevel} restarted`);
   }
 
   private showLevelMapModal(): void {
@@ -818,14 +810,12 @@ export class Game {
     // Hide the completion popup since user clicked the level map button
     this.state.showLevelCompletionPopup = false;
     
-    console.log('Level map highlighted in right panel');
   }
 
   private awardPowerUp(type: PowerUpType): void {
     const powerUp = this.state.powerUps.find(p => p.type === type);
     if (powerUp) {
       powerUp.count++;
-      console.log(`Awarded ${type} power-up! New count: ${powerUp.count}`);
     }
   }
 
@@ -848,10 +838,7 @@ export class Game {
       return;
     }
 
-    console.log(`Power-up ${powerUpType} used on cell (${targetPosition.x},${targetPosition.y})`);
-    
     if (!this.usePowerUp(powerUpType)) {
-      console.log(`No ${powerUpType} power-ups available`);
       return;
     }
 
@@ -859,7 +846,6 @@ export class Game {
       case PowerUpType.FREE_SWAP:
         this.state.greenCell = targetPosition;
         this.state.activePowerUp = PowerUpType.FREE_SWAP;
-        console.log('Free swap activated - click any cell to swap with the green cell');
         break;
       case PowerUpType.CLEAR_CELLS:
         this.useClearCellsPowerUp(targetPosition);
@@ -901,8 +887,6 @@ export class Game {
     this.board.removeCells(cellsToRemove);
     this.state.board = this.board.getBoard();
     
-    console.log(`Cleared ${cellsToRemove.length} cells with Clear Cells power-up`);
-    
     // Check for new matches after the clearing
     const newMatches = this.board.findMatches();
     if (newMatches.length > 0) {
@@ -916,8 +900,6 @@ export class Game {
     // Replace all instances of the target symbol with random symbols
     this.board.swapAllSymbols(targetSymbol);
     this.state.board = this.board.getBoard();
-    
-    console.log(`Symbol swap used - replaced all ${targetSymbol} symbols`);
     
     // Check for new matches after the symbol swap
     const newMatches = this.board.findMatches();
@@ -952,65 +934,52 @@ export class Game {
       localStorage.setItem('superblast_highest_level', highestLevel.toString());
       
       this.state.showLevelCompletionPopup = true;
-      console.log(`Level ${this.state.level.currentLevel} completed! Next level ${nextLevel} unlocked. Awarded ${clearCellsToAward} Clear Cells power-ups.`);
     }
   }
 
   private checkLevelFailure(): void {
-    console.log(`🚨 CHECK LEVEL FAILURE CALLED: progress=${this.state.level.progress.toFixed(2)}, timeRemaining=${this.state.timer.timeRemaining}, gameStarted=${this.gameStarted}, gameScreenVisible=${this.gameScreenVisible}, timerInitialized=${this.timerInitialized}`);
-    
     // COMPREHENSIVE SAFETY CHECKS - ALL must be true to show Level Failed
     
     // Check 1: Basic game state requirements
     if (this.state.level.progress >= 1) {
-      console.log('Level failure check: Level already completed');
       return;
     }
     
     if (this.state.timer.timeRemaining > 0) {
-      console.log('Level failure check: Timer still has time remaining');
       return;
     }
     
     // Check 2: Game initialization state
     if (!this.gameStarted) {
-      console.log('Level failure check: Game not started yet');
       return;
     }
     
     if (!this.gameScreenVisible) {
-      console.log('Level failure check: Game screen not visible');
       return;
     }
     
     if (!this.timerInitialized) {
-      console.log('Level failure check: Timer not initialized yet');
       return;
     }
     
     // Check 3: Time-based safety checks
     if (this.levelStartTime === 0) {
-      console.log('Level failure check: Level start time not set');
       return;
     }
     
     const timeSinceLevelStart = performance.now() - this.levelStartTime;
     if (timeSinceLevelStart < 5000) { // 5 seconds minimum
-      console.log(`Level failure check: Only ${Math.round(timeSinceLevelStart/1000)}s since level start, need 5s minimum`);
       return;
     }
     
     // Check 4: Timer state validation
     if (this.state.timer.startTime === 0) {
-      console.log('Level failure check: Timer start time not set');
       return;
     }
     
     // ALL CHECKS PASSED - Show Level Failed
     this.state.timer.isActive = false;
-    console.log(`🚨💥 SETTING showLevelFailedPopup = true! This should trigger the modal to show.`);
     this.state.showLevelFailedPopup = true;
-    console.log(`Level ${this.state.level.currentLevel} LEGITIMATELY FAILED! Progress: ${(this.state.level.progress * 100).toFixed(1)}% after ${Math.round(timeSinceLevelStart/1000)}s`);
   }
 
   public destroy(): void {
@@ -1032,20 +1001,15 @@ export class Game {
   }
 
   public setGameScreenVisible(visible: boolean): void {
-    console.log(`🎮 SET GAME SCREEN VISIBLE: ${visible} (was ${this.gameScreenVisible}), timerInitialized=${this.timerInitialized}`);
     this.gameScreenVisible = visible;
     if (visible && !this.timerInitialized) {
-      console.log(`🎮 SET GAME SCREEN VISIBLE: Starting timer in 1 second...`);
       // Start the timer when game screen becomes visible for the first time
       setTimeout(() => {
-        console.log(`🎮 TIMER TIMEOUT EXECUTED: Setting gameStarted=true, starting timer`);
         this.gameStarted = true;
         this.startGameTimer();
         this.timerInitialized = true;
-        console.log('Timer started after game screen became visible');
       }, 1000); // 1 second delay to ensure proper initialization
     } else if (!visible) {
-      console.log(`🎮 SET GAME SCREEN VISIBLE: Hiding all modals because screen not visible`);
       // Hide all modals when game screen is not visible
       this.state.showLevelCompletionPopup = false;
       this.state.showPausePopup = false;

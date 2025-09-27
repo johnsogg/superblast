@@ -20,36 +20,42 @@
       
       #game-container {
         display: flex;
-        align-items: center;
-        gap: 15px;
+        align-items: stretch;
+        justify-content: space-between;
+        gap: 20px;
         width: 100vw;
-        max-height: 100vh;
+        height: 100vh;
         position: relative;
         box-sizing: border-box;
-        padding: 0 10px;
+        padding: 20px;
         overflow: hidden;
       }
       
       #game-canvas {
         border: 1px solid #333;
         background-color: #000;
-        flex-grow: 1;
-        flex-shrink: 1;
-        min-width: 300px;
-        max-width: calc(100vw - 400px);
+        flex: 1;
+        max-height: calc(100vh - 40px);
+        /* Canvas size will be set explicitly by JavaScript */
       }
       
       #ui-column {
         width: 280px;
+        min-width: 280px;
+        max-width: 280px;
         background-color: #2a2a2a;
         border: 1px solid #333;
         border-radius: 8px;
         padding: 20px;
+        margin-right: 20px;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
         gap: 20px;
         flex-shrink: 0;
+        height: fit-content;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
       }
       
       .ui-section {
@@ -100,9 +106,9 @@
       /* Progress Bar */
       #progress-container {
         position: absolute;
-        bottom: 10px;
-        left: 0;
-        right: 320px; /* Account for UI column width + gap */
+        bottom: 20px;
+        left: 20px;
+        right: 340px; /* Account for UI column + margins + gap */
         height: 20px;
         background-color: #333;
         border: 2px solid #555;
@@ -539,7 +545,7 @@
         background-color: #333;
         border: 1px solid #555;
         border-radius: 8px;
-        width: 60px;
+        width: 100%;
         height: 60px;
         display: flex;
         align-items: center;
@@ -547,6 +553,7 @@
         cursor: pointer;
         transition: all 0.2s ease;
         flex-shrink: 0;
+        margin-bottom: 10px;
       }
 
       #pause-button:hover {
@@ -714,15 +721,14 @@
     <div id="game-container">
       <canvas id="game-canvas"></canvas>
       
-      <!-- Pause Button -->
-      <button id="pause-button">
-        <div class="pause-icon">
-          <div class="pause-bar"></div>
-          <div class="pause-bar"></div>
-        </div>
-      </button>
-      
       <div id="ui-column">
+        <!-- Pause Button -->
+        <button id="pause-button">
+          <div class="pause-icon">
+            <div class="pause-bar"></div>
+            <div class="pause-bar"></div>
+          </div>
+        </button>
         <div class="ui-section">
           <h3>Score</h3>
           <div id="score-display">0</div>

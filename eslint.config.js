@@ -25,6 +25,7 @@ export default [
         clearInterval: 'readonly',
         global: 'readonly',
         performance: 'readonly',
+        localStorage: 'readonly',
       },
     },
     plugins: {

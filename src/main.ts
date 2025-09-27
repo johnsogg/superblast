@@ -8,14 +8,18 @@ if (!canvas) {
 
 // Set canvas size to account for UI column (280px + 20px gap = 300px)
 const uiColumnWidth = 300;
-canvas.width = Math.max(400, window.innerWidth - uiColumnWidth);
-canvas.height = window.innerHeight;
+const canvasWidth = Math.max(400, window.innerWidth - uiColumnWidth);
+const canvasHeight = window.innerHeight;
+
+canvas.width = canvasWidth;
+canvas.height = canvasHeight;
+
+// Ensure canvas display size matches internal size to prevent coordinate issues
+canvas.style.width = `${canvasWidth}px`;
+canvas.style.height = `${canvasHeight}px`;
 
 // Initialize the app (starts on home screen)
-console.log('🚀 MAIN: Initializing App...');
 const app = new App(canvas);
-
-console.log('🚀 MAIN: Superblast app initialized!');
 
 // Handle cleanup on page unload
 window.addEventListener('beforeunload', () => {

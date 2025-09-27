@@ -1,4 +1,5 @@
 import { SymbolType, Cell, Position, SYMBOL_COLORS, BOARD_WIDTH, BOARD_HEIGHT, DragState, SwapAnimation, MatchAnimation, PowerUpDragState } from './types';
+import { DebugUtils } from './DebugUtils';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -20,6 +21,12 @@ export class Renderer {
   public calculateDimensions(): void {
     const { width, height } = this.canvas;
     
+    // Validate canvas dimensions
+    if (width <= 0 || height <= 0) {
+      console.warn(`Invalid canvas dimensions: ${width}x${height}`);
+      return;
+    }
+    
     // Calculate cell size to fit the grid with some padding
     const availableWidth = width * 0.9; // 90% of canvas width
     const availableHeight = height * 0.9; // 90% of canvas height (no space needed for score)
@@ -35,6 +42,48 @@ export class Renderer {
     
     this.offsetX = (width - totalGridWidth) / 2;
     this.offsetY = (height - totalGridHeight) / 2;
+    
+    console.log(`Renderer dimensions: canvas=${width}x${height}, cellSize=${this.cellSize.toFixed(2)}, offset=(${this.offsetX.toFixed(2)}, ${this.offsetY.toFixed(2)})`);
+  }
+
+  public validateCanvasSize(): boolean {
+    const rect = this.canvas.getBoundingClientRect();
+    const displayWidth = rect.width;
+    const displayHeight = rect.height;
+    const internalWidth = this.canvas.width;
+    const internalHeight = this.canvas.height;
+    
+    // Check if display size matches internal size (allowing for small rounding differences)
+    const widthMismatch = Math.abs(displayWidth - internalWidth) > 1;
+    const heightMismatch = Math.abs(displayHeight - internalHeight) > 1;
+    
+    if (widthMismatch || heightMismatch) {
+      console.warn(`Canvas size mismatch! Display: ${displayWidth.toFixed(1)}x${displayHeight.toFixed(1)}, Internal: ${internalWidth}x${internalHeight}`);
+      console.warn(`This can cause mouse coordinate issues. Canvas style: width=${this.canvas.style.width}, height=${this.canvas.style.height}`);
+      return false;
+    }
+    
+    return true;
+  }
+
+  public testCoordinateAccuracy(): void {
+    // Test coordinate conversion accuracy at grid boundaries
+    console.log('🧪 Testing coordinate conversion accuracy...');
+    
+    const testPoints = [
+      // Top-left corner of each cell in first row
+      { x: this.offsetX, y: this.offsetY }, // (0,0)
+      { x: this.offsetX + this.cellSize, y: this.offsetY }, // (1,0)
+      { x: this.offsetX + 2 * this.cellSize, y: this.offsetY }, // (2,0)
+      // Test points near cell boundaries
+      { x: this.offsetX + this.cellSize - 0.1, y: this.offsetY + this.cellSize - 0.1 }, // Should be (0,0)
+      { x: this.offsetX + this.cellSize + 0.1, y: this.offsetY + this.cellSize + 0.1 }, // Should be (1,1)
+    ];
+    
+    testPoints.forEach((point, i) => {
+      const position = this.getPositionFromPixel(point.x, point.y);
+      console.log(`Test ${i}: pixel(${point.x.toFixed(1)}, ${point.y.toFixed(1)}) -> cell${position ? `(${position.x}, ${position.y})` : 'null'}`);
+    });
   }
 
   public render(board: Cell[][], selectedCell: Position | null = null, dragInfo: DragState | null = null, swapAnimation: SwapAnimation | null = null, matchAnimations: MatchAnimation[] = [], greenCell: Position | null = null, powerUpDragState: PowerUpDragState | null = null): void {
@@ -59,6 +108,21 @@ export class Renderer {
   }
 
   public getPositionFromPixel(pixelX: number, pixelY: number): Position | null {
+    // Validate input coordinates
+    if (!Number.isFinite(pixelX) || !Number.isFinite(pixelY)) {
+      console.warn(`Invalid pixel coordinates: (${pixelX}, ${pixelY})`);
+      return null;
+    }
+    
+    // Ensure dimensions are calculated
+    if (this.cellSize <= 0) {
+      console.warn(`Invalid cellSize: ${this.cellSize} - calling calculateDimensions`);
+      this.calculateDimensions();
+      if (this.cellSize <= 0) {
+        return null;
+      }
+    }
+    
     const gridX = pixelX - this.offsetX;
     const gridY = pixelY - this.offsetY;
     
@@ -68,6 +132,9 @@ export class Renderer {
     
     const cellX = Math.floor(gridX / this.cellSize);
     const cellY = Math.floor(gridY / this.cellSize);
+    
+    // Debug logging for coordinate conversion
+    DebugUtils.logCoordinateConversion(pixelX, pixelY, gridX, gridY, cellX, cellY, this.cellSize, { x: this.offsetX, y: this.offsetY });
     
     if (cellX >= 0 && cellX < BOARD_WIDTH && cellY >= 0 && cellY < BOARD_HEIGHT) {
       return { x: cellX, y: cellY };

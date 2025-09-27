@@ -1,5 +1,6 @@
 import { Position, PowerUpType } from './types';
 import { Renderer } from './Renderer';
+import { DebugUtils } from './DebugUtils';
 
 export interface InputEvents {
   onCellClick: (position: Position) => void;
@@ -99,6 +100,9 @@ export class InputHandler {
     const y = event.clientY - rect.top;
     
     const position = this.renderer.getPositionFromPixel(x, y);
+    
+    // Debug logging for mouse coordinate conversion
+    DebugUtils.logMouseEvent('MouseDown', event.clientX, event.clientY, rect, x, y, position, { width: this.canvas.width, height: this.canvas.height });
     if (position) {
       this.isDragging = true;
       this.dragStart = position;
@@ -139,6 +143,9 @@ export class InputHandler {
     const y = event.clientY - rect.top;
     
     const endPosition = this.renderer.getPositionFromPixel(x, y);
+    
+    // Debug logging for drag completion
+    // console.log(`MouseUp: drag from (${this.dragStart.x}, ${this.dragStart.y}) to ${endPosition ? `(${endPosition.x}, ${endPosition.y})` : 'null'}`);
     
     // If we ended in a different cell that's adjacent to where we started, trigger swap
     if (endPosition && 
