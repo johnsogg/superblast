@@ -11,8 +11,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "lint": "eslint src test --ext .ts,.js",
-    "lint:fix": "eslint src test --ext .ts,.js --fix",
+    "lint": "eslint src test",
+    "lint:fix": "eslint src test --fix",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

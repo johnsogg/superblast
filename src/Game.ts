@@ -22,6 +22,8 @@ export class Game {
   private timerElement: HTMLElement;
   private progressBarElement: HTMLElement;
   private levelCompletionModalElement: HTMLElement;
+  private levelCompletionModalTitleElement: HTMLElement;
+  private levelCompletionPlayButtonElement: HTMLElement;
   private pauseModalElement: HTMLElement;
   private levelFailedModalElement: HTMLElement;
   private pauseButtonElement: HTMLElement;
@@ -79,6 +81,8 @@ export class Game {
     this.timerElement = document.getElementById('timer-display')!;
     this.progressBarElement = document.getElementById('progress-bar')!;
     this.levelCompletionModalElement = document.getElementById('level-completion-modal')!;
+    this.levelCompletionModalTitleElement = this.levelCompletionModalElement.querySelector('.modal-title')!;
+    this.levelCompletionPlayButtonElement = this.levelCompletionModalElement.querySelector('.play-button')!;
     this.pauseModalElement = document.getElementById('pause-modal')!;
     this.levelFailedModalElement = document.getElementById('level-failed-modal')!;
     this.pauseButtonElement = document.getElementById('pause-button')!;
@@ -90,7 +94,7 @@ export class Game {
       symbolSwap: document.getElementById('symbol-swap-count')!,
     };
     
-    if (!this.scoreElement || !this.timerElement || !this.progressBarElement || !this.levelCompletionModalElement || !this.pauseModalElement || !this.levelFailedModalElement || !this.pauseButtonElement) {
+    if (!this.scoreElement || !this.timerElement || !this.progressBarElement || !this.levelCompletionModalElement || !this.levelCompletionModalTitleElement || !this.levelCompletionPlayButtonElement || !this.pauseModalElement || !this.levelFailedModalElement || !this.pauseButtonElement) {
       throw new Error('Could not find required UI elements');
     }
     
@@ -696,7 +700,10 @@ export class Game {
         }
         break;
       case PopupAction.PLAY_NEXT:
-        this.startNextLevel();
+        // Only allow starting next level if the game isn't completed
+        if (!this.isGameCompleted()) {
+          this.startNextLevel();
+        }
         break;
       case PopupAction.LEVEL_MAP:
         this.showLevelMapModal();
@@ -751,6 +758,13 @@ export class Game {
       completedLevels,
       maxUnlockedLevel: this.state.level.currentLevel,
     });
+
+    // Restart the timer for the new level (after 1 second delay like initial game start)
+    setTimeout(() => {
+      this.gameStarted = true;
+      this.startGameTimer();
+      this.timerInitialized = true;
+    }, 1000);
 
   }
 
@@ -928,6 +942,17 @@ export class Game {
         this.awardPowerUp(PowerUpType.CLEAR_CELLS);
       }
       
+      // Check if this is game completion (level 10) or regular level completion
+      if (this.isGameCompleted()) {
+        // Game completed - show "Game Completed" message and hide Play button
+        this.levelCompletionModalTitleElement.textContent = 'Game Completed';
+        this.levelCompletionPlayButtonElement.style.display = 'none';
+      } else {
+        // Regular level completion - show "Level Completed" message and show Play button
+        this.levelCompletionModalTitleElement.textContent = 'Level Completed';
+        this.levelCompletionPlayButtonElement.style.display = 'block';
+      }
+      
       // Save the next level as unlocked (completing level N unlocks level N+1)
       const nextLevel = this.state.level.currentLevel + 1;
       const highestLevel = Math.max(nextLevel, this.getHighestLevelReached());
@@ -996,6 +1021,10 @@ export class Game {
     return this.board;
   }
 
+  private isGameCompleted(): boolean {
+    return this.state.level.currentLevel === 10 && this.state.level.progress >= 1;
+  }
+
   public setHomeCallback(callback: () => void): void {
     this.homeCallback = callback;
   }
@@ -1029,5 +1058,19 @@ export class Game {
   public static getHighestLevelReached(): number {
     const saved = localStorage.getItem('superblast_highest_level');
     return saved ? parseInt(saved, 10) : 1;
+  }
+
+  public handleCanvasResize(): void {
+    // Recalculate renderer dimensions when canvas size changes
+    this.renderer.calculateDimensions();
+    
+    // Validate canvas size consistency and log any issues
+    const isValid = this.renderer.validateCanvasSize();
+    if (!isValid) {
+      console.warn('Canvas size mismatch detected after resize - this may cause coordinate issues');
+    }
+    
+    // Trigger a re-render to ensure everything is positioned correctly
+    this.render();
   }
 }

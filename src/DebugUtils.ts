@@ -71,6 +71,33 @@ export class DebugUtils {
   }
 }
 
+// Automatically validate canvas setup on page load
+document.addEventListener('DOMContentLoaded', () => {
+  // Small delay to ensure all elements are properly initialized
+  setTimeout(() => {
+    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const displayWidth = rect.width;
+      const displayHeight = rect.height;
+      const internalWidth = canvas.width;
+      const internalHeight = canvas.height;
+      
+      // Check for size mismatches that cause coordinate issues
+      const widthMismatch = Math.abs(displayWidth - internalWidth) > 1;
+      const heightMismatch = Math.abs(displayHeight - internalHeight) > 1;
+      
+      if (widthMismatch || heightMismatch) {
+        console.warn(`⚠️  Canvas size mismatch detected!`);
+        console.warn(`Display: ${displayWidth.toFixed(1)}x${displayHeight.toFixed(1)}, Internal: ${internalWidth}x${internalHeight}`);
+        console.warn(`This will cause mouse coordinate issues. Enable debug with SuperblastDebug.enableDebug() to troubleshoot.`);
+      } else {
+        console.log(`✅ Canvas size validation passed: ${internalWidth}x${internalHeight}`);
+      }
+    }
+  }, 500);
+});
+
 // Make debug utils available globally for easy debugging
 (window as unknown as { SuperblastDebug: unknown }).SuperblastDebug = {
   enableDebug: () => DebugUtils.enableDebug(),

@@ -104,6 +104,13 @@ export class App {
     return this.currentState;
   }
 
+  public handleCanvasResize(): void {
+    // Notify the current game instance about canvas resize
+    if (this.game && this.currentState === AppState.GAME) {
+      this.game.handleCanvasResize();
+    }
+  }
+
   public destroy(): void {
     if (this.game) {
       this.game.destroy();
