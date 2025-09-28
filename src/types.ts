@@ -44,14 +44,17 @@ export interface TimerState {
 
 export interface LevelState {
   currentLevel: number;
+  maxUnlockedLevel: number; // highest level the player has reached
   progress: number; // 0 to 1 (0% to 100%)
   progressDenominator: number; // the denominator for this level
+  completedLevels: number[]; // levels that have been fully completed
 }
 
 export enum AppState {
   HOME = 'home',
   GAME = 'game',
   LEVEL_SELECT = 'level_select',
+  LARGE_LEVEL_MAP = 'large_level_map',
 }
 
 export enum PopupAction {

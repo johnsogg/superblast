@@ -37,6 +37,7 @@ export class Game {
     symbolSwap: HTMLElement;
   };
   private homeCallback: (() => void) | null = null;
+  private largeLevelMapCallback: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, startingLevel: number = 1) {
     this.canvas = canvas;
@@ -59,8 +60,10 @@ export class Game {
       },
       level: {
         currentLevel: startingLevel,
+        maxUnlockedLevel: Game.getHighestLevelReached(),
         progress: 0,
         progressDenominator: LEVEL_DENOMINATORS[Math.min(startingLevel, 10) as keyof typeof LEVEL_DENOMINATORS] || LEVEL_DENOMINATORS[10],
+        completedLevels: Game.getCompletedLevels(),
       },
       showLevelCompletionPopup: false,
       showLevelFailedPopup: false,
@@ -114,9 +117,10 @@ export class Game {
     this.levelMap = new LevelMap(levelMapContainer);
     this.levelMap.updateState({
       currentLevel: this.state.level.currentLevel,
-      completedLevels: [],
-      maxUnlockedLevel: this.state.level.currentLevel,
+      completedLevels: this.state.level.completedLevels,
+      maxUnlockedLevel: this.state.level.maxUnlockedLevel,
     });
+
 
     // Set up modal button event listeners
     this.setupModalEventListeners();
@@ -718,8 +722,6 @@ export class Game {
   }
 
   private startNextLevel(): void {
-    // Mark current level as completed
-    const completedLevel = this.state.level.currentLevel;
     
     // Hide the completion popup
     this.state.showLevelCompletionPopup = false;
@@ -752,11 +754,10 @@ export class Game {
     this.pauseStartTime = null;
 
     // Update level map with completed levels and new current level
-    const completedLevels = [...(this.levelMap?.getCompletedLevels() || []), completedLevel];
     this.levelMap?.updateState({
       currentLevel: this.state.level.currentLevel,
-      completedLevels,
-      maxUnlockedLevel: this.state.level.currentLevel,
+      completedLevels: this.state.level.completedLevels,
+      maxUnlockedLevel: this.state.level.maxUnlockedLevel,
     });
 
     // Restart the timer for the new level (after 1 second delay like initial game start)
@@ -805,25 +806,15 @@ export class Game {
   }
 
   private showLevelMapModal(): void {
-    // For now, we'll just focus the level map in the right panel
-    // In a future version, this could open a larger modal with the level map
-    const levelsSectionElement = document.getElementById('levels-section');
-    if (levelsSectionElement) {
-      // Scroll the level map into view and add a temporary highlight
-      levelsSectionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      levelsSectionElement.style.outline = '3px solid #4ade80';
-      levelsSectionElement.style.borderRadius = '8px';
-      
-      // Remove the highlight after a short delay
-      setTimeout(() => {
-        levelsSectionElement.style.outline = '';
-        levelsSectionElement.style.borderRadius = '';
-      }, 2000);
-    }
-    
-    // Hide the completion popup since user clicked the level map button
+    // Hide any open popups first
     this.state.showLevelCompletionPopup = false;
+    this.state.showPausePopup = false;
+    this.state.showLevelFailedPopup = false;
     
+    // Show the full-screen large level map
+    if (this.largeLevelMapCallback) {
+      this.largeLevelMapCallback();
+    }
   }
 
   private awardPowerUp(type: PowerUpType): void {
@@ -953,10 +944,17 @@ export class Game {
         this.levelCompletionPlayButtonElement.style.display = 'block';
       }
       
+      // Save the current level as completed
+      if (!this.state.level.completedLevels.includes(this.state.level.currentLevel)) {
+        this.state.level.completedLevels.push(this.state.level.currentLevel);
+        localStorage.setItem('superblast_completed_levels', JSON.stringify(this.state.level.completedLevels));
+      }
+      
       // Save the next level as unlocked (completing level N unlocks level N+1)
       const nextLevel = this.state.level.currentLevel + 1;
-      const highestLevel = Math.max(nextLevel, this.getHighestLevelReached());
-      localStorage.setItem('superblast_highest_level', highestLevel.toString());
+      const newMaxUnlocked = Math.max(nextLevel, this.state.level.maxUnlockedLevel);
+      this.state.level.maxUnlockedLevel = newMaxUnlocked;
+      localStorage.setItem('superblast_highest_level', newMaxUnlocked.toString());
       
       this.state.showLevelCompletionPopup = true;
     }
@@ -1029,6 +1027,22 @@ export class Game {
     this.homeCallback = callback;
   }
 
+  public setLargeLevelMapCallback(callback: () => void): void {
+    this.largeLevelMapCallback = callback;
+  }
+
+  public getCurrentLevel(): number {
+    return this.state.level.currentLevel;
+  }
+
+  public getMaxUnlockedLevel(): number {
+    return this.state.level.maxUnlockedLevel;
+  }
+
+  public getCompletedLevels(): number[] {
+    return [...this.state.level.completedLevels];
+  }
+
   public setGameScreenVisible(visible: boolean): void {
     this.gameScreenVisible = visible;
     if (visible && !this.timerInitialized) {
@@ -1047,10 +1061,6 @@ export class Game {
     }
   }
 
-  public getCurrentLevel(): number {
-    return this.state.level.currentLevel;
-  }
-
   public getHighestLevelReached(): number {
     return Game.getHighestLevelReached();
   }
@@ -1058,6 +1068,11 @@ export class Game {
   public static getHighestLevelReached(): number {
     const saved = localStorage.getItem('superblast_highest_level');
     return saved ? parseInt(saved, 10) : 1;
+  }
+
+  public static getCompletedLevels(): number[] {
+    const saved = localStorage.getItem('superblast_completed_levels');
+    return saved ? JSON.parse(saved) : [];
   }
 
   public handleCanvasResize(): void {

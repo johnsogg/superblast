@@ -697,6 +697,151 @@
         font-size: 20px;
         font-weight: bold;
       }
+
+
+      /* Large Level Map Screen Styling */
+      #large-level-map-screen {
+        display: none;
+        flex-direction: column;
+        width: 100vw;
+        height: 100vh;
+        background-color: #1a1a1a;
+        color: #ffffff;
+      }
+
+      .large-level-map-header {
+        display: flex;
+        align-items: center;
+        padding: 20px 40px;
+        background-color: #2a2a2a;
+        border-bottom: 2px solid #333;
+        gap: 20px;
+      }
+
+      .back-button {
+        background-color: #333;
+        border: 2px solid #555;
+        border-radius: 8px;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #ffffff;
+        font-size: 24px;
+      }
+
+      .back-button:hover {
+        background-color: #444;
+        border-color: #4ade80;
+        transform: scale(1.05);
+      }
+
+      .large-level-map-title {
+        font-size: 48px;
+        font-weight: bold;
+        color: #4ade80;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      .large-level-map-container {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+      }
+
+      .large-level-map-svg {
+        width: 100%;
+        height: 100%;
+        max-width: 800px;
+        max-height: 600px;
+        background-color: transparent;
+      }
+
+      /* Large level map specific styling */
+      .large-level-node {
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+
+      .large-level-node:hover {
+        /* Removed transform scale to prevent jittery effect */
+      }
+
+      .large-level-node.locked {
+        cursor: not-allowed;
+      }
+
+      .large-level-node.locked:hover {
+        transform: none;
+      }
+
+      .large-level-circle {
+        stroke-width: 4;
+        transition: fill 0.3s ease, stroke 0.3s ease;
+      }
+
+      .large-level-circle.current {
+        fill: #eab308;
+        stroke: #f59e0b;
+        filter: drop-shadow(0 0 10px rgba(234, 179, 8, 0.6));
+      }
+
+      .large-level-circle.unlocked {
+        fill: #333;
+        stroke: #4ade80;
+      }
+
+      .large-level-circle.locked {
+        fill: #1a1a1a;
+        stroke: #555;
+      }
+
+      .large-level-text {
+        font-size: 20px;
+        font-weight: bold;
+        fill: #ffffff;
+        pointer-events: none;
+        font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+      }
+
+      .large-level-path {
+        stroke-width: 4;
+        fill: none;
+        transition: stroke 0.3s ease;
+      }
+
+      .large-level-path.unlocked {
+        stroke: #4ade80;
+      }
+
+      .large-level-path.locked {
+        stroke: #555;
+        stroke-dasharray: 8,8;
+      }
+
+      /* Padlock icon for locked levels */
+      .padlock {
+        pointer-events: none;
+      }
+
+      .padlock-body {
+        fill: #555;
+        stroke: #333;
+        stroke-width: 1;
+      }
+
+      .padlock-shackle {
+        fill: none;
+        stroke: #555;
+        stroke-width: 2;
+      }
     </style>
   </head>
   <body>
@@ -714,6 +859,19 @@
         </div>
         
         <button id="home-learn-button" class="home-learn-button">Learn</button>
+      </div>
+    </div>
+
+    <!-- Large Level Map Screen -->
+    <div id="large-level-map-screen">
+      <div class="large-level-map-header">
+        <button id="back-to-game-button" class="back-button">
+          <span class="back-icon">←</span>
+        </button>
+        <h1 class="large-level-map-title">All Levels</h1>
+      </div>
+      <div class="large-level-map-container">
+        <svg id="large-level-map-svg" class="large-level-map-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
     </div>
 
@@ -793,13 +951,13 @@
       <div class="modal-content">
         <div class="modal-title">Level Completed</div>
         <div class="modal-buttons">
-          <button class="modal-button home-button" data-action="home">
+          <button class="modal-button home-button" data-action="home" title="Home Screen">
             <span class="home-icon"></span>
           </button>
-          <button class="modal-button play-button" data-action="play_next">
+          <button class="modal-button play-button" data-action="play_next" title="Next Level">
             <span class="play-icon"></span>
           </button>
-          <button class="modal-button map-button" data-action="level_map">
+          <button class="modal-button map-button" data-action="level_map" title="Large Level Map">
             <span class="map-icon"></span>
           </button>
         </div>
@@ -811,13 +969,13 @@
       <div class="modal-content">
         <div class="modal-title">Game Paused</div>
         <div class="modal-buttons">
-          <button class="modal-button home-button" data-action="home">
+          <button class="modal-button home-button" data-action="home" title="Home Screen">
             <span class="home-icon"></span>
           </button>
-          <button class="modal-button play-button" data-action="resume">
+          <button class="modal-button play-button" data-action="resume" title="Resume">
             <span class="play-icon"></span>
           </button>
-          <button class="modal-button map-button" data-action="level_map">
+          <button class="modal-button map-button" data-action="level_map" title="Large Level Map">
             <span class="map-icon"></span>
           </button>
         </div>
@@ -829,7 +987,7 @@
       <div class="modal-content">
         <div class="modal-title">Level Failed</div>
         <div class="modal-buttons">
-          <button class="modal-button restart-button" data-action="restart_level">
+          <button class="modal-button restart-button" data-action="restart_level" title="Restart Level">
             <span class="restart-icon"></span>
           </button>
         </div>
