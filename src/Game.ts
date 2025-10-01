@@ -4,7 +4,7 @@ import { InputHandler } from './InputHandler';
 import { AudioUtils } from './AudioUtils';
 import { LevelMap } from './LevelMap';
 import { DebugUtils } from './DebugUtils';
-import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction, PowerUpType } from './types';
+import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction, PowerUpType, LEVEL_PROMOTED_POWERUPS, DOUBLE_POWERUP_PROBABILITY } from './types';
 
 export class Game {
   private board: GameBoard;
@@ -482,7 +482,7 @@ export class Game {
     await this.waitForMatchAnimations();
 
     // Remove matches and replace with new symbols
-    this.board.removeMatches(matches);
+    this.board.removeMatches(matches, this.state.level.currentLevel);
     this.state.board = this.board.getBoard();
 
     // Check for new matches created by the refill
@@ -821,6 +821,16 @@ export class Game {
     const powerUp = this.state.powerUps.find(p => p.type === type);
     if (powerUp) {
       powerUp.count++;
+      
+      // Check for double power-up award for levels 6-8
+      const currentLevel = this.state.level.currentLevel;
+      if (currentLevel >= 6 && currentLevel <= 8) {
+        const promotedPowerUp = LEVEL_PROMOTED_POWERUPS[currentLevel as keyof typeof LEVEL_PROMOTED_POWERUPS];
+        if (promotedPowerUp === type && Math.random() < DOUBLE_POWERUP_PROBABILITY) {
+          // Award an additional power-up of the same type
+          powerUp.count++;
+        }
+      }
     }
   }
 
@@ -889,7 +899,7 @@ export class Game {
     }
 
     // Remove the cells from the board
-    this.board.removeCells(cellsToRemove);
+    this.board.removeCells(cellsToRemove, this.state.level.currentLevel);
     this.state.board = this.board.getBoard();
     
     // Check for new matches after the clearing
@@ -903,7 +913,7 @@ export class Game {
     const targetSymbol = this.state.board[targetPosition.y][targetPosition.x].symbol;
     
     // Replace all instances of the target symbol with random symbols
-    this.board.swapAllSymbols(targetSymbol);
+    this.board.swapAllSymbols(targetSymbol, this.state.level.currentLevel);
     this.state.board = this.board.getBoard();
     
     // Check for new matches after the symbol swap

@@ -1,4 +1,4 @@
-import { SymbolType, Cell, Position, Match, BOARD_WIDTH, BOARD_HEIGHT } from './types';
+import { SymbolType, Cell, Position, Match, BOARD_WIDTH, BOARD_HEIGHT, LEVEL_PRIVILEGED_SYMBOLS, PRIVILEGED_SYMBOL_PROBABILITY } from './types';
 
 export class GameBoard {
   private board: Cell[][];
@@ -59,19 +59,29 @@ export class GameBoard {
     return true;
   }
 
-  public removeCells(positions: Position[]): void {
+  public removeCells(positions: Position[], level?: number): void {
+    // For power-up usage, don't check for privileged symbol matches since it's not a regular match
     positions.forEach(pos => {
       if (this.isValidPosition(pos)) {
-        this.board[pos.y][pos.x].symbol = this.getRandomSymbol();
+        this.board[pos.y][pos.x].symbol = this.getRandomSymbol(level, false);
       }
     });
   }
 
-  public swapAllSymbols(targetSymbol: SymbolType): void {
+  public swapAllSymbols(targetSymbol: SymbolType, level?: number): void {
+    // Check if we're swapping the privileged symbol for this level
+    let privilegedSymbolWasMatched = false;
+    if (level && level >= 1 && level <= 5) {
+      const privilegedSymbol = LEVEL_PRIVILEGED_SYMBOLS[level as keyof typeof LEVEL_PRIVILEGED_SYMBOLS];
+      if (privilegedSymbol && targetSymbol === privilegedSymbol) {
+        privilegedSymbolWasMatched = true;
+      }
+    }
+    
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         if (this.board[y][x].symbol === targetSymbol) {
-          this.board[y][x].symbol = this.getRandomSymbol();
+          this.board[y][x].symbol = this.getRandomSymbol(level, privilegedSymbolWasMatched);
         }
       }
     }
@@ -131,8 +141,17 @@ export class GameBoard {
     return matches;
   }
 
-  public removeMatches(matches: Match[]): void {
+  public removeMatches(matches: Match[], level?: number): void {
     const toRemove = new Set<string>();
+    
+    // Check if any of the matches contain the privileged symbol for this level
+    let privilegedSymbolWasMatched = false;
+    if (level && level >= 1 && level <= 5) {
+      const privilegedSymbol = LEVEL_PRIVILEGED_SYMBOLS[level as keyof typeof LEVEL_PRIVILEGED_SYMBOLS];
+      if (privilegedSymbol) {
+        privilegedSymbolWasMatched = matches.some(match => match.symbol === privilegedSymbol);
+      }
+    }
     
     matches.forEach(match => {
       match.positions.forEach(pos => {
@@ -143,7 +162,7 @@ export class GameBoard {
     // Generate new random symbols for removed positions
     toRemove.forEach(posStr => {
       const [x, y] = posStr.split(',').map(Number);
-      this.board[y][x].symbol = this.getRandomSymbol();
+      this.board[y][x].symbol = this.getRandomSymbol(level, privilegedSymbolWasMatched);
     });
   }
 
@@ -213,8 +232,31 @@ export class GameBoard {
     return availableSymbols[Math.floor(Math.random() * availableSymbols.length)];
   }
 
-  private getRandomSymbol(): SymbolType {
+  private getRandomSymbol(level?: number, privilegedSymbolWasMatched?: boolean): SymbolType {
     const symbols = Object.values(SymbolType);
-    return symbols[Math.floor(Math.random() * symbols.length)];
+    
+    // Use uniform distribution if no level specified, or if it's not levels 1-5,
+    // or if the privileged symbol was matched (exception case)
+    if (!level || level < 1 || level > 5 || privilegedSymbolWasMatched) {
+      return symbols[Math.floor(Math.random() * symbols.length)];
+    }
+    
+    const privilegedSymbol = LEVEL_PRIVILEGED_SYMBOLS[level as keyof typeof LEVEL_PRIVILEGED_SYMBOLS];
+    if (!privilegedSymbol) {
+      // Fallback to uniform distribution if level not found in mapping
+      return symbols[Math.floor(Math.random() * symbols.length)];
+    }
+    
+    // Use weighted distribution: 40% for privileged, 15% each for others
+    const random = Math.random();
+    
+    if (random < PRIVILEGED_SYMBOL_PROBABILITY) {
+      return privilegedSymbol;
+    }
+    
+    // For the remaining 60%, distribute equally among the other 4 symbols
+    const otherSymbols = symbols.filter(symbol => symbol !== privilegedSymbol);
+    const otherSymbolIndex = Math.floor((random - PRIVILEGED_SYMBOL_PROBABILITY) / (1 - PRIVILEGED_SYMBOL_PROBABILITY) * otherSymbols.length);
+    return otherSymbols[otherSymbolIndex];
   }
 }

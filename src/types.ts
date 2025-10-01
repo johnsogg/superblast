@@ -151,3 +151,23 @@ export const MATCH_PROGRESS_NUMERATORS = {
   4: 2, // 4-match fills 2/denominator  
   5: 3, // 5+-match fills 3/denominator
 } as const;
+
+// Level-specific symbol probability configuration
+export const PRIVILEGED_SYMBOL_PROBABILITY = 0.4; // 40% chance for privileged symbol
+export const DOUBLE_POWERUP_PROBABILITY = 0.3; // 30% chance for double power-ups
+
+// Mapping of levels 1-5 to their privileged symbols
+export const LEVEL_PRIVILEGED_SYMBOLS = {
+  1: SymbolType.LEAF,
+  2: SymbolType.SNOWFLAKE,
+  3: SymbolType.FIRE,
+  4: SymbolType.RAINDROP,
+  5: SymbolType.LIGHTNING,
+} as const;
+
+// Mapping of levels 6-8 to their promoted power-ups
+export const LEVEL_PROMOTED_POWERUPS = {
+  6: PowerUpType.FREE_SWAP,
+  7: PowerUpType.CLEAR_CELLS,
+  8: PowerUpType.SYMBOL_SWAP,
+} as const;
