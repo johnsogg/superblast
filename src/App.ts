@@ -184,6 +184,9 @@ export class App {
       this.tutorialGame.setTutorialCompleteCallback(() => {
         this.goHome();
       });
+    } else {
+      // Reset tutorial to beginning when returning to it
+      this.tutorialGame.reset();
     }
 
     // Size the tutorial canvas

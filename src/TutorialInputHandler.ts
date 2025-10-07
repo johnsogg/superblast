@@ -268,4 +268,9 @@ export class TutorialInputHandler {
     
     return null;
   }
+
+  public refreshPowerUpListeners(): void {
+    // Re-setup power-up listeners for tutorial sidebar power-ups
+    this.setupPowerUpListeners();
+  }
 }

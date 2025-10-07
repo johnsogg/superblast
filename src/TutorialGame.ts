@@ -18,6 +18,7 @@ import {
 export class TutorialGame {
   private board: TutorialGameBoard;
   private renderer: TutorialRenderer;
+  private inputHandler: TutorialInputHandler;
   private state: GameState;
   private tutorialState: TutorialState;
   private dragState: DragState | null = null;
@@ -116,7 +117,7 @@ export class TutorialGame {
     };
 
     // Set up input handling
-    new TutorialInputHandler(canvas, this.renderer, {
+    this.inputHandler = new TutorialInputHandler(canvas, this.renderer, {
       onCellClick: this.handleCellClick.bind(this),
       onCellDrag: this.handleCellDrag.bind(this),
       onDragUpdate: this.handleDragUpdate.bind(this),
@@ -248,6 +249,9 @@ export class TutorialGame {
         break;
     }
 
+    // Update power-up counts in UI
+    this.updatePowerUpCounts();
+    
     this.checkPhaseCompletion();
   }
 
@@ -517,6 +521,47 @@ export class TutorialGame {
     if (phaseCounterElement) phaseCounterElement.textContent = instruction.counter;
     if (titleElement) titleElement.textContent = instruction.title;
     if (textElement) textElement.textContent = instruction.text;
+    
+    // Manage sidebar visibility and layout
+    this.updateSidebarVisibility();
+    this.updatePowerUpCounts();
+  }
+
+  private updateSidebarVisibility(): void {
+    const sidebar = document.getElementById('tutorial-sidebar');
+    const container = document.querySelector('.tutorial-container');
+    
+    // Show sidebar only during power-up phases
+    const isPowerUpPhase = this.tutorialState.currentPhase === TutorialPhase.POWER_UP_FREE_SWAP ||
+                          this.tutorialState.currentPhase === TutorialPhase.POWER_UP_CLEAR_CELLS ||
+                          this.tutorialState.currentPhase === TutorialPhase.POWER_UP_SYMBOL_SWAP;
+    
+    if (sidebar) {
+      sidebar.style.display = isPowerUpPhase ? 'flex' : 'none';
+    }
+    
+    if (container) {
+      if (isPowerUpPhase) {
+        container.classList.add('with-sidebar');
+        // Refresh power-up listeners when sidebar becomes visible
+        setTimeout(() => {
+          this.inputHandler.refreshPowerUpListeners();
+        }, 100); // Small delay to ensure DOM is updated
+      } else {
+        container.classList.remove('with-sidebar');
+      }
+    }
+  }
+
+  private updatePowerUpCounts(): void {
+    // Update tutorial power-up count displays
+    const freeSwapCount = document.getElementById('tutorial-free-swap-count');
+    const clearCellsCount = document.getElementById('tutorial-clear-cells-count');
+    const symbolSwapCount = document.getElementById('tutorial-symbol-swap-count');
+    
+    if (freeSwapCount) freeSwapCount.textContent = this.state.powerUps[0].count.toString();
+    if (clearCellsCount) clearCellsCount.textContent = this.state.powerUps[1].count.toString();
+    if (symbolSwapCount) symbolSwapCount.textContent = this.state.powerUps[2].count.toString();
   }
 
   private startGameLoop(): void {
@@ -586,6 +631,40 @@ export class TutorialGame {
 
   public setTutorialCompleteCallback(callback: () => void): void {
     this.onTutorialComplete = callback;
+  }
+
+  public reset(): void {
+    // Reset tutorial state to beginning
+    this.tutorialState = {
+      currentPhase: TutorialPhase.MATCH_THREE,
+      phaseProgress: 0,
+      instructionText: '',
+      highlightedCells: [],
+      nextButtonVisible: false,
+      completed: false,
+    };
+
+    // Reset game state
+    this.state.score = 0;
+    this.state.selectedCell = null;
+    this.state.isSwapping = false;
+    this.state.swapAnimation = null;
+    this.state.matchAnimations = [];
+    this.state.powerUps = [
+      { type: PowerUpType.FREE_SWAP, count: 0 },
+      { type: PowerUpType.CLEAR_CELLS, count: 0 },
+      { type: PowerUpType.SYMBOL_SWAP, count: 0 },
+    ];
+    this.state.powerUpDragState = null;
+    this.state.activePowerUp = null;
+    this.state.greenCell = null;
+
+    // Clear any drag state
+    this.dragState = null;
+
+    // Setup the first phase
+    this.setupPhase(this.tutorialState.currentPhase);
+    this.updateInstructionUI();
   }
 
   public getCurrentPhase(): TutorialPhase {

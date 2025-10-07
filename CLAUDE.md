@@ -21,3 +21,7 @@ Important: refer to @GAME.md for all game mechanics and player flow.
 - `npm run lint` - Check code with ESLint
 - `npm run lint:fix` - Fix ESLint issues automatically
 - `npm run typecheck` - Run TypeScript type checking
+
+## Runtime Considerations
+
+- The app is usually already running - ask the user before trying to start it, or assume that it is running.
