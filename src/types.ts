@@ -55,6 +55,7 @@ export enum AppState {
   GAME = 'game',
   LEVEL_SELECT = 'level_select',
   LARGE_LEVEL_MAP = 'large_level_map',
+  TUTORIAL = 'tutorial',
 }
 
 export enum PopupAction {
@@ -127,6 +128,10 @@ export const SYMBOL_COLORS = {
 export const BOARD_WIDTH = 9;
 export const BOARD_HEIGHT = 7;
 
+// Tutorial board dimensions
+export const TUTORIAL_BOARD_WIDTH = 5;
+export const TUTORIAL_BOARD_HEIGHT = 6;
+
 export const POINTS = {
   THREE_IN_ROW: 10,
   FOUR_IN_ROW: 20,
@@ -171,3 +176,23 @@ export const LEVEL_PROMOTED_POWERUPS = {
   7: PowerUpType.CLEAR_CELLS,
   8: PowerUpType.SYMBOL_SWAP,
 } as const;
+
+// Tutorial-specific types
+export enum TutorialPhase {
+  MATCH_THREE = 'match_three',
+  MATCH_FOUR = 'match_four',
+  MATCH_FIVE = 'match_five',
+  POWER_UP_FREE_SWAP = 'power_up_free_swap',
+  POWER_UP_CLEAR_CELLS = 'power_up_clear_cells',
+  POWER_UP_SYMBOL_SWAP = 'power_up_symbol_swap',
+  COMPLETE = 'complete',
+}
+
+export interface TutorialState {
+  currentPhase: TutorialPhase;
+  phaseProgress: number; // 0 to 1
+  instructionText: string;
+  highlightedCells: Position[];
+  nextButtonVisible: boolean;
+  completed: boolean;
+}

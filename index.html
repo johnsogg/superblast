@@ -842,6 +842,185 @@
         stroke: #555;
         stroke-width: 2;
       }
+
+      /* Tutorial Screen Styling */
+      #tutorial-screen {
+        display: none;
+        flex-direction: column;
+        width: 100vw;
+        height: 100vh;
+        background-color: #1a1a1a;
+        color: #ffffff;
+      }
+
+      .tutorial-header {
+        display: flex;
+        align-items: center;
+        padding: 20px 40px;
+        background-color: #2a2a2a;
+        border-bottom: 2px solid #333;
+        gap: 20px;
+      }
+
+      .tutorial-title {
+        font-size: 48px;
+        font-weight: bold;
+        color: #60a5fa;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      .tutorial-container {
+        flex: 1;
+        display: flex;
+        padding: 40px;
+        gap: 40px;
+        align-items: stretch;
+      }
+
+      .tutorial-game-area {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #2a2a2a;
+        border: 2px solid #333;
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      #tutorial-canvas {
+        border: 1px solid #555;
+        background-color: #000;
+        border-radius: 8px;
+      }
+
+      .tutorial-instruction-panel {
+        width: 400px;
+        min-width: 400px;
+        background-color: #2a2a2a;
+        border: 2px solid #60a5fa;
+        border-radius: 12px;
+        padding: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+      }
+
+      .tutorial-phase-indicator {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        background-color: #333;
+        border-radius: 8px;
+      }
+
+      #tutorial-phase-text {
+        font-size: 18px;
+        font-weight: bold;
+        color: #60a5fa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      #tutorial-phase-counter {
+        font-size: 16px;
+        color: #888;
+        font-weight: bold;
+      }
+
+      .tutorial-instruction-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      #tutorial-instruction-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #60a5fa;
+        margin: 0;
+      }
+
+      #tutorial-instruction-text {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #cccccc;
+        margin: 0;
+      }
+
+      .tutorial-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .tutorial-button {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+        color: #000;
+        border: none;
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3);
+      }
+
+      .tutorial-button:hover {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(96, 165, 250, 0.4);
+      }
+
+      .tutorial-button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 10px rgba(96, 165, 250, 0.3);
+      }
+
+      .tutorial-button.secondary {
+        background: linear-gradient(135deg, #6b7280, #4b5563);
+        color: #ffffff;
+        box-shadow: 0 4px 15px rgba(107, 114, 128, 0.3);
+      }
+
+      .tutorial-button.secondary:hover {
+        background: linear-gradient(135deg, #4b5563, #374151);
+        box-shadow: 0 6px 20px rgba(107, 114, 128, 0.4);
+      }
+
+      .tutorial-button.secondary:active {
+        box-shadow: 0 2px 10px rgba(107, 114, 128, 0.3);
+      }
+
+      /* Tutorial highlight overlay */
+      .tutorial-highlight {
+        position: absolute;
+        border: 3px solid #60a5fa;
+        border-radius: 8px;
+        background-color: rgba(96, 165, 250, 0.2);
+        pointer-events: none;
+        z-index: 10;
+        animation: tutorial-pulse 2s infinite;
+      }
+
+      @keyframes tutorial-pulse {
+        0% { 
+          box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7);
+        }
+        50% { 
+          box-shadow: 0 0 0 10px rgba(96, 165, 250, 0);
+        }
+        100% { 
+          box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+        }
+      }
     </style>
   </head>
   <body>
@@ -872,6 +1051,35 @@
       </div>
       <div class="large-level-map-container">
         <svg id="large-level-map-svg" class="large-level-map-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </div>
+
+    <!-- Tutorial Screen -->
+    <div id="tutorial-screen">
+      <div class="tutorial-header">
+        <button id="tutorial-back-button" class="back-button">
+          <span class="back-icon">←</span>
+        </button>
+        <h1 class="tutorial-title">Tutorial</h1>
+      </div>
+      <div class="tutorial-container">
+        <div class="tutorial-game-area">
+          <canvas id="tutorial-canvas"></canvas>
+        </div>
+        <div class="tutorial-instruction-panel">
+          <div class="tutorial-phase-indicator">
+            <span id="tutorial-phase-text">Welcome</span>
+            <span id="tutorial-phase-counter">1/5</span>
+          </div>
+          <div class="tutorial-instruction-content">
+            <h3 id="tutorial-instruction-title">Welcome to Super Blast!</h3>
+            <p id="tutorial-instruction-text">Let's learn how to play this exciting match-3 puzzle game.</p>
+          </div>
+          <div class="tutorial-controls">
+            <button id="tutorial-next-button" class="tutorial-button" style="display: none;">Next</button>
+            <button id="tutorial-skip-button" class="tutorial-button secondary">Skip Tutorial</button>
+          </div>
+        </div>
       </div>
     </div>
 
