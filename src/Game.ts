@@ -4,7 +4,7 @@ import { InputHandler } from './InputHandler';
 import { AudioUtils } from './AudioUtils';
 import { LevelMap } from './LevelMap';
 import { DebugUtils } from './DebugUtils';
-import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction, PowerUpType, LEVEL_PROMOTED_POWERUPS, DOUBLE_POWERUP_PROBABILITY } from './types';
+import { GameState, Position, Match, POINTS, DragState, MatchAnimation, MatchAnimationCopy, LEVEL_DENOMINATORS, MATCH_PROGRESS_NUMERATORS, PopupAction, PowerUpType, LEVEL_PROMOTED_POWERUPS, DOUBLE_POWERUP_PROBABILITY, GameMode, MODE_CONFIGS } from './types';
 
 export class Game {
   private board: GameBoard;
@@ -38,12 +38,17 @@ export class Game {
   };
   private homeCallback: (() => void) | null = null;
   private largeLevelMapCallback: (() => void) | null = null;
+  private timerDuration: number;
 
-  constructor(canvas: HTMLCanvasElement, startingLevel: number = 1) {
+  constructor(canvas: HTMLCanvasElement, startingLevel: number = 1, gameMode: GameMode = GameMode.EASY) {
     this.canvas = canvas;
     this.board = new GameBoard();
     this.renderer = new Renderer(canvas);
     this.audioUtils = new AudioUtils();
+    
+    // Get timer duration based on game mode
+    const modeConfig = MODE_CONFIGS[gameMode];
+    this.timerDuration = modeConfig.timeLimit;
     
     this.state = {
       board: this.board.getBoard(),
@@ -53,7 +58,7 @@ export class Game {
       swapAnimation: null,
       matchAnimations: [],
       timer: {
-        timeRemaining: 120000, // 2 minutes in milliseconds
+        timeRemaining: this.timerDuration,
         isActive: false, // Start inactive to prevent false level failed on startup
         startTime: 0,
         pausedTime: 0,
@@ -62,7 +67,7 @@ export class Game {
         currentLevel: startingLevel,
         maxUnlockedLevel: Game.getHighestLevelReached(),
         progress: 0,
-        progressDenominator: LEVEL_DENOMINATORS[Math.min(startingLevel, 10) as keyof typeof LEVEL_DENOMINATORS] || LEVEL_DENOMINATORS[10],
+        progressDenominator: LEVEL_DENOMINATORS[Math.min(startingLevel, 30) as keyof typeof LEVEL_DENOMINATORS] || LEVEL_DENOMINATORS[30],
         completedLevels: Game.getCompletedLevels(),
       },
       showLevelCompletionPopup: false,
@@ -592,7 +597,7 @@ export class Game {
 
     const now = performance.now();
     const elapsed = now - this.state.timer.startTime - this.state.timer.pausedTime;
-    this.state.timer.timeRemaining = Math.max(0, 120000 - elapsed);
+    this.state.timer.timeRemaining = Math.max(0, this.timerDuration - elapsed);
 
     if (this.state.timer.timeRemaining === 0) {
       this.state.timer.isActive = false;
@@ -601,6 +606,11 @@ export class Game {
   }
 
   private startGameTimer(): void {
+    // Guard against double-initialization
+    if (this.state.timer.isActive) {
+      return;
+    }
+    
     this.state.timer.isActive = true;
     this.state.timer.startTime = performance.now();
     this.levelStartTime = performance.now();
@@ -729,18 +739,18 @@ export class Game {
 
     // Advance to next level
     this.state.level.currentLevel++;
-    if (this.state.level.currentLevel <= 10) {
+    if (this.state.level.currentLevel <= 30) {
       this.state.level.progressDenominator = LEVEL_DENOMINATORS[this.state.level.currentLevel as keyof typeof LEVEL_DENOMINATORS];
     } else {
-      // For levels beyond 10, keep using level 10's denominator
-      this.state.level.progressDenominator = LEVEL_DENOMINATORS[10];
+      // For levels beyond 30, keep using level 30's denominator
+      this.state.level.progressDenominator = LEVEL_DENOMINATORS[30];
     }
 
     // Reset progress
     this.state.level.progress = 0;
 
     // Reset timer (start inactive, will be activated after delay)
-    this.state.timer.timeRemaining = 120000;
+    this.state.timer.timeRemaining = this.timerDuration;
     this.state.timer.isActive = false;
     this.state.timer.startTime = 0;
     this.state.timer.pausedTime = 0;
@@ -760,12 +770,10 @@ export class Game {
       maxUnlockedLevel: this.state.level.maxUnlockedLevel,
     });
 
-    // Restart the timer for the new level (after 1 second delay like initial game start)
-    setTimeout(() => {
-      this.gameStarted = true;
-      this.startGameTimer();
-      this.timerInitialized = true;
-    }, 1000);
+    // Restart the timer for the new level immediately
+    this.gameStarted = true;
+    this.startGameTimer();
+    this.timerInitialized = true;
 
   }
 
@@ -777,7 +785,7 @@ export class Game {
     this.state.level.progress = 0;
     
     // Reset timer (start inactive, will be activated after delay)
-    this.state.timer.timeRemaining = 120000; // 2 minutes
+    this.state.timer.timeRemaining = this.timerDuration;
     this.state.timer.isActive = false;
     this.state.timer.startTime = 0;
     this.state.timer.pausedTime = 0;
@@ -803,6 +811,10 @@ export class Game {
     this.state.swapAnimation = null;
     this.state.matchAnimations = [];
     
+    // Restart the timer for the restarted level immediately
+    this.gameStarted = true;
+    this.startGameTimer();
+    this.timerInitialized = true;
   }
 
   private showLevelMapModal(): void {
@@ -1055,13 +1067,12 @@ export class Game {
 
   public setGameScreenVisible(visible: boolean): void {
     this.gameScreenVisible = visible;
-    if (visible && !this.timerInitialized) {
-      // Start the timer when game screen becomes visible for the first time
-      setTimeout(() => {
-        this.gameStarted = true;
-        this.startGameTimer();
-        this.timerInitialized = true;
-      }, 1000); // 1 second delay to ensure proper initialization
+    if (visible && !this.timerInitialized && !this.gameStarted) {
+      // Start the timer immediately when game screen becomes visible for the first time
+      // Only if game hasn't already started to prevent double-initialization
+      this.gameStarted = true;
+      this.startGameTimer();
+      this.timerInitialized = true;
     } else if (!visible) {
       // Hide all modals when game screen is not visible
       this.state.showLevelCompletionPopup = false;

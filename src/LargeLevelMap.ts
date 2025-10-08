@@ -4,6 +4,11 @@ export interface LargeLevelMapState {
   completedLevels: number[];
 }
 
+export interface LargeLevelMapMode {
+  startLevel: number;
+  endLevel: number;
+}
+
 interface LevelNode {
   level: number;
   x: number;
@@ -14,34 +19,69 @@ interface LevelNode {
 export class LargeLevelMap {
   private svg: SVGElement;
   private state: LargeLevelMapState;
+  private mode: LargeLevelMapMode;
   private onLevelSelect: ((level: number) => void) | null = null;
 
-  constructor(svg: SVGElement) {
+  constructor(svg: SVGElement, mode: LargeLevelMapMode = { startLevel: 1, endLevel: 10 }) {
     this.svg = svg;
+    this.mode = mode;
     this.state = {
-      currentLevel: 1,
-      maxUnlockedLevel: 1,
+      currentLevel: mode.startLevel,
+      maxUnlockedLevel: mode.startLevel,
       completedLevels: [],
     };
     
     this.render();
   }
 
+  public setMode(mode: LargeLevelMapMode): void {
+    this.mode = mode;
+    this.render();
+  }
+
   private getLevelNodes(): LevelNode[] {
-    // Based on the hand sketch, create a curvy path through all 10 levels
-    // Using the layout from the sketch: starts at bottom with 1, goes up in a winding pattern
-    return [
-      { level: 1, x: 120, y: 520, connections: [2] }, // Bottom center
-      { level: 2, x: 250, y: 480, connections: [1, 3] }, // Bottom right
-      { level: 3, x: 480, y: 420, connections: [2, 4] }, // Mid-right
-      { level: 4, x: 680, y: 320, connections: [3, 5] }, // Top-right area
-      { level: 5, x: 620, y: 180, connections: [4, 6] }, // Upper-right
-      { level: 6, x: 400, y: 120, connections: [5, 7] }, // Top center
-      { level: 7, x: 180, y: 160, connections: [6, 8] }, // Top left
-      { level: 8, x: 80, y: 280, connections: [7, 9] }, // Mid-left
-      { level: 9, x: 280, y: 360, connections: [8, 10] }, // Center
-      { level: 10, x: 520, y: 280, connections: [9] }, // Mid-right (end)
+    // Create a curvy path through all levels in the current mode's range
+    // Use the same relative positions but map them to the current level range
+    const basePositions = [
+      { x: 120, y: 520 }, // Bottom center
+      { x: 250, y: 480 }, // Bottom right
+      { x: 480, y: 420 }, // Mid-right
+      { x: 680, y: 320 }, // Top-right area
+      { x: 620, y: 180 }, // Upper-right
+      { x: 400, y: 120 }, // Top center
+      { x: 180, y: 160 }, // Top left
+      { x: 80, y: 280 },  // Mid-left
+      { x: 280, y: 360 }, // Center
+      { x: 520, y: 280 }, // Mid-right (end)
     ];
+
+    const nodes: LevelNode[] = [];
+    const { startLevel, endLevel } = this.mode;
+    
+    for (let i = 0; i < 10 && startLevel + i <= endLevel; i++) {
+      const level = startLevel + i;
+      const pos = basePositions[i];
+      const connections: number[] = [];
+      
+      // Add connection to previous level (except for first level)
+      if (i > 0) {
+        connections.push(level - 1);
+      }
+      
+      // Add connection to next level (except for last level)
+      if (i < 9 && startLevel + i + 1 <= endLevel) {
+        connections.push(level + 1);
+      }
+      
+      nodes.push({
+        level,
+        x: pos.x,
+        y: pos.y,
+        connections
+      });
+    }
+    
+    return nodes;
   }
 
   private drawPath(from: LevelNode, to: LevelNode): void {
